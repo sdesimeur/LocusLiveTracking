@@ -53,7 +53,8 @@ if (isset($uuid)) {
 			$data = json_decode($json, true);
 			$gpx = new SimpleXMLElement('<gpx version="1.1"  xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpxtrkx="http://www.garmin.com/xmlschemas/TrackStatsExtension/v1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v2" xmlns:locus="http://www.locusmap.eu"></gpx>');
 			// Ajouter une trace (trk)
-			$namespace = 'http://www.locusmap.eu';
+			$namespace_locus = 'http://www.locusmap.eu';
+			$namespace_gpxtpx = 'http://www.garmin.com/xmlschemas/TrackPointExtension/v2';
 			
 			//$lastLoc = end($data['trackPoints']);
 			$wpt = $gpx->addChild('wpt');
@@ -71,10 +72,10 @@ if (isset($uuid)) {
 			$trkextline->addChild('opacity', '0.78');
 			$trkextline->addChild('width', '3.0');
 			$trkextlineext = $trkextline->addChild('extensions');
-			$trkextlineext->addChild('locus:lsColorBase', '#C8FF0000', $namespace);
-			$trkextlineext->addChild('locus:lsWidth', '3.0', $namespace);
-			$trkextlineext->addChild('locus:lsUnits', 'PIXELS', $namespace);
-			$trkext->addChild('locus:activity', 'cycling', $namespace);
+			$trkextlineext->addChild('locus:lsColorBase', '#C8FF0000', $namespace_locus);
+			$trkextlineext->addChild('locus:lsWidth', '3.0', $namespace_locus);
+			$trkextlineext->addChild('locus:lsUnits', 'PIXELS', $namespace_locus);
+			$trkext->addChild('locus:activity', 'cycling', $namespace_locus);
 			$trkseg = $trk->addChild('trkseg');
 			$previous_dist = 0;
 			// Parcourir les données JSON et ajouter les points de trace
@@ -88,8 +89,10 @@ if (isset($uuid)) {
 					$trkpt->addChild('ele', $loc['altitude']);
 					$trkpt->addChild('time', $loc['dateTime']);
 					$trkptext = $trkpt->addChild('extensions');
-					$trkptext = $trkptext->addChild('gpxtpx:TrackPointExtension', '', $namespace);
-					$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist ,$namespace);
+					$trkptext = $trkptext->addChild('gpxtpx:TrackPointExtension', '', $namespace_gpxtpx);
+					$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist, $namespace_gpxtpx);
+					$trkptext->addChild('gpxtpx:cad', $loc['cadenceCyclesPerMin'], $namespace_gpxtpx);
+					$trkptext->addChild('gpxtpx:hr', $loc['heartRateBeatsPerMin'], $namespace_gpxtpx);
 					$previous_dist = $loc['distanceMeters'];
 					//$trkpt = $trkseg->addChild('trkpt');
 				}
