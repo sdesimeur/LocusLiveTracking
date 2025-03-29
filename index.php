@@ -51,7 +51,7 @@ if (isset($uuid)) {
 				echo "No download";
 		} else {
 			$data = json_decode($json, true);
-			$gpx = new SimpleXMLElement('<gpx version="1.1" xmlns:locus="http://www.locusmap.eu"></gpx>');
+			$gpx = new SimpleXMLElement('<gpx version="1.1"  xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpxtrkx="http://www.garmin.com/xmlschemas/TrackStatsExtension/v1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v2" xmlns:locus="http://www.locusmap.eu"></gpx>');
 			// Ajouter une trace (trk)
 			$namespace = 'http://www.locusmap.eu';
 			
@@ -76,20 +76,29 @@ if (isset($uuid)) {
 			$trkextlineext->addChild('locus:lsUnits', 'PIXELS', $namespace);
 			$trkext->addChild('locus:activity', 'cycling', $namespace);
 			$trkseg = $trk->addChild('trkseg');
-		
+			$previous_dist = 0;
 			// Parcourir les données JSON et ajouter les points de trace
 			foreach ($data['trackPoints'] as $loc) {
 				$pos = $loc['position'];
 				if ($pos['lat'] != 0 && $pos['lon']!=0) {
-					$lastLocPos = $pos;
+					$lastLoc = $loc;
 					$trkpt = $trkseg->addChild('trkpt');
 					$trkpt->addAttribute('lat', $pos['lat']);
 					$trkpt->addAttribute('lon', $pos['lon']);
+					$trkpt->addChild('ele', $loc['altitude']);
+					$trkpt->addChild('time', $loc['dateTime']);
+					$trkptext = $trkpt->addChild('extensions');
+					$trkptext = $trkptext->addChild('gpxtpx:TrackPointExtension', '', $namespace);
+					$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist ,$namespace);
+					$previous_dist = $loc['distanceMeters'];
+					//$trkpt = $trkseg->addChild('trkpt');
 				}
 			}
 			
-			$wpt->addAttribute('lat', $lastLocPos['lat']);
-			$wpt->addAttribute('lon', $lastLocPos['lon']);
+			$wpt->addAttribute('lat', $lastLoc['position']['lat']);
+			$wpt->addAttribute('lon', $lastLoc['position']['lon']);
+			$wpt->addChild('time', $lastLoc['dateTime']);
+			$wpt->addChild('ele', $lastLoc['altitude']);
 			// Ajouter un waypoint pour la dernière localisation
 			// Format le XML pour afficher
 			$dom = new DOMDocument('1.0');
