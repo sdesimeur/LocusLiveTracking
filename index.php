@@ -55,10 +55,10 @@ if (isset($uuid)) {
 			// Ajouter une trace (trk)
 			$namespace = 'http://www.locusmap.eu';
 			
-			$lastLoc = end($data['trackPoints']);
+			//$lastLoc = end($data['trackPoints']);
 			$wpt = $gpx->addChild('wpt');
-			$wpt->addAttribute('lat', $lastLoc['position']['lat']);
-			$wpt->addAttribute('lon', $lastLoc['position']['lon']);
+			//$wpt->addAttribute('lat', $lastLoc['position']['lat']);
+			//$wpt->addAttribute('lon', $lastLoc['position']['lon']);
 			$wpt->addChild('name', $name);
 			$wpt->addChild('sym', 'Bike Trail');
 
@@ -79,12 +79,17 @@ if (isset($uuid)) {
 		
 			// Parcourir les données JSON et ajouter les points de trace
 			foreach ($data['trackPoints'] as $loc) {
-				$trkpt = $trkseg->addChild('trkpt');
 				$pos = $loc['position'];
-				$trkpt->addAttribute('lat', $pos['lat']);
-				$trkpt->addAttribute('lon', $pos['lon']);
+				if ($pos['lat'] != 0 && $pos['lon']!=0) {
+					$lastLocPos = $pos;
+					$trkpt = $trkseg->addChild('trkpt');
+					$trkpt->addAttribute('lat', $pos['lat']);
+					$trkpt->addAttribute('lon', $pos['lon']);
+				}
 			}
 			
+			$wpt->addAttribute('lat', $lastLocPos['lat']);
+			$wpt->addAttribute('lon', $lastLocPos['lon']);
 			// Ajouter un waypoint pour la dernière localisation
 			// Format le XML pour afficher
 			$dom = new DOMDocument('1.0');
