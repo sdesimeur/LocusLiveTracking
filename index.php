@@ -91,9 +91,9 @@ if (isset($uuid)) {
 					$trkptext = $trkpt->addChild('extensions');
 					$trkptext = $trkptext->addChild('gpxtpx:TrackPointExtension', '', $namespace_gpxtpx);
 					$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist, $namespace_gpxtpx);
-					$trkptext->addChild('gpxtpx:cad', $loc['cadenceCyclesPerMin'], $namespace_gpxtpx);
-					$trkptext->addChild('gpxtpx:hr', $loc['heartRateBeatsPerMin'], $namespace_gpxtpx);
-					$previous_dist = $loc['distanceMeters'];
+					$trkptext->addChild('gpxtpx:cad', $loc['fitnessPointData']['cadenceCyclesPerMin'], $namespace_gpxtpx);
+					$trkptext->addChild('gpxtpx:hr', $loc['fitnessPointData']['heartRateBeatsPerMin'], $namespace_gpxtpx);
+					$previous_dist = $loc['fitnessPointData']['distanceMeters'];
 					//$trkpt = $trkseg->addChild('trkpt');
 				}
 			}
