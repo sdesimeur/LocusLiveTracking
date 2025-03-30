@@ -63,7 +63,6 @@ if (isset($uuid)) {
 			//$wpt->addAttribute('lat', $lastLoc['position']['lat']);
 			//$wpt->addAttribute('lon', $lastLoc['position']['lon']);
 			$wpt->addChild('name', $name);
-			$wpt->addChild('sym', 'Bike Trail');
 
 			$trk = $gpx->addChild('trk');
 			$trk->addChild('name', $name);
@@ -107,6 +106,23 @@ if (isset($uuid)) {
 			$wpt->addAttribute('lon', $lastLoc['position']['lon']);
 			$wpt->addChild('time', $lastLoc['dateTime']);
 			$wpt->addChild('ele', $lastLoc['altitude']);
+			switch (strtolower($lastLoc['fitnessPointData']['activityType'])) {
+			case 'swimming':
+				$sym = 'sport-swim-outdoor';
+				break;
+			case 'running':
+				$sym = 'sport-hiking';
+				break;
+			case 'cycling':
+				$sym = 'sport-cyclngsport';
+				break;
+			default:
+				$sym = 'z-ico02';
+				break;
+			}
+			$wpt->addChild('sym', $sym);
+			
+			
 			// Ajouter un waypoint pour la dernière localisation
 			// Format le XML pour afficher
 			$dom = new DOMDocument('1.0');
