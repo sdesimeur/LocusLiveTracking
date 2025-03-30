@@ -35,14 +35,16 @@ if (preg_match($pattern, $content, $matches)) {
 	exit(1);
 }
 
-$pattern = '#des mises =C3=A0 jour Livetrack de ([0-9a-zA-Z]*) \.#i';
-if (preg_match($pattern, $content, $matches)) {
-	$user = strtolower($matches[1]);
-	echo "User trouvé : $user\r\n";
+$pattern0 = '#des mises =C3=A0 jour Livetrack de ([0-9a-zA-Z]*) \.#i';
+//$pattern1 = '#>Invitation de ([0-9a-zA-Z]*)</div>#i';
+if (preg_match($pattern0, $content, $matches)) {
+//} else if (preg_match($pattern1, $content, $matches)) {	i
 } else {
 	echo "Aucun user Garmin LiveTrack trouvée.";
 	exit(1);
 }
+$user = strtolower($matches[1]);
+echo "User trouvé : $user\r\n";
 
 #if (!isset($store->uuids)) $store->uuids = [];
 $uuids->$user = $uuid;
