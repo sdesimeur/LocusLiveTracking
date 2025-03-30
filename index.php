@@ -45,11 +45,13 @@ if (isset($uuid)) {
 		// Utiliser file_get_contents pour récupérer le contenu de l'URL
 		$json = file_get_contents($url);
 		
+		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/tmp/garmin.txt', serialize($json));
 		//$gpx = file_get_contents("test.gpx");
 	
 		if ($json == false) {
 				echo "No download";
 		} else {
+			$words = $datas->words;
 			$data = json_decode($json, true);
 			$gpx = new SimpleXMLElement('<gpx version="1.1"  xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpxtrkx="http://www.garmin.com/xmlschemas/TrackStatsExtension/v1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v2" xmlns:locus="http://www.locusmap.eu"></gpx>');
 			// Ajouter une trace (trk)
@@ -80,6 +82,7 @@ if (isset($uuid)) {
 			//$previous_dist = 0;
 			// Parcourir les données JSON et ajouter les points de trace
 			foreach ($data['trackPoints'] as $loc) {
+				$words[] = $loc['fitnessPointData']['activityType'];
 				$pos = $loc['position'];
 				if ($pos['lat'] != 0 && $pos['lon']!=0) {
 					$lastLoc = $loc;
@@ -97,6 +100,7 @@ if (isset($uuid)) {
 					//$trkpt = $trkseg->addChild('trkpt');
 				}
 			}
+			$datas->words = array_unique($words);
 			
 			$wpt->addAttribute('lat', $lastLoc['position']['lat']);
 			$wpt->addAttribute('lon', $lastLoc['position']['lon']);
