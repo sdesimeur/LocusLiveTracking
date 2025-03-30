@@ -77,7 +77,7 @@ if (isset($uuid)) {
 			$trkextlineext->addChild('locus:lsColorBase', '#C8FF0000', $namespace_locus);
 			$trkextlineext->addChild('locus:lsWidth', '3.0', $namespace_locus);
 			$trkextlineext->addChild('locus:lsUnits', 'PIXELS', $namespace_locus);
-			$trkext->addChild('locus:activity', 'cycling', $namespace_locus);
+			$trkextactivity = $trkext->addChild('locus:activity', '', $namespace_locus);
 			$trkseg = $trk->addChild('trkseg');
 			//$previous_dist = 0;
 			// Parcourir les données JSON et ajouter les points de trace
@@ -100,6 +100,7 @@ if (isset($uuid)) {
 					//$trkpt = $trkseg->addChild('trkpt');
 				}
 			}
+			$trkextactivity = $trkext->addChild('locus:activity', strtolower($lastLoc['fitnessPointData']['activityType']), $namespace_locus);
 			$datas->words = array_unique($words);
 			
 			$wpt->addAttribute('lat', $lastLoc['position']['lat']);
