@@ -77,7 +77,7 @@ if (isset($uuid)) {
 			$trkextlineext->addChild('locus:lsUnits', 'PIXELS', $namespace_locus);
 			$trkext->addChild('locus:activity', 'cycling', $namespace_locus);
 			$trkseg = $trk->addChild('trkseg');
-			$previous_dist = 0;
+			//$previous_dist = 0;
 			// Parcourir les données JSON et ajouter les points de trace
 			foreach ($data['trackPoints'] as $loc) {
 				$pos = $loc['position'];
@@ -90,10 +90,10 @@ if (isset($uuid)) {
 					$trkpt->addChild('time', $loc['dateTime']);
 					$trkptext = $trkpt->addChild('extensions');
 					$trkptext = $trkptext->addChild('gpxtpx:TrackPointExtension', '', $namespace_gpxtpx);
-					$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist, $namespace_gpxtpx);
+					//$trkptext->addChild('gpxtpx:course', $loc['distanceMeters'] - $previous_dist, $namespace_gpxtpx);
 					$trkptext->addChild('gpxtpx:cad', $loc['fitnessPointData']['cadenceCyclesPerMin'], $namespace_gpxtpx);
 					$trkptext->addChild('gpxtpx:hr', $loc['fitnessPointData']['heartRateBeatsPerMin'], $namespace_gpxtpx);
-					$previous_dist = $loc['fitnessPointData']['distanceMeters'];
+					//$previous_dist = $loc['fitnessPointData']['distanceMeters'];
 					//$trkpt = $trkseg->addChild('trkpt');
 				}
 			}
