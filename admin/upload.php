@@ -22,9 +22,9 @@ if (isset($_FILES['fichier']) && $_FILES['fichier']['error'] === UPLOAD_ERR_OK) 
 $path = $dest;
 if (file_exists($path)) {
 	$content = file_get_contents($path);
-	$content=nl2br(htmlspecialchars($content));
+	$content=str_replace('= ', '', nl2br(htmlspecialchars($content)));
 }
-
+//echo $content;
 $pattern = '#https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/#i';
 
 if (preg_match($pattern, $content, $matches)) {
