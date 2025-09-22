@@ -25,17 +25,19 @@ if (file_exists($path)) {
 	$content=str_replace('= ', '', nl2br(htmlspecialchars($content)));
 }
 //echo $content;
-$pattern = '#https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/#i';
+$pattern = '#https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]#i';
 
 if (preg_match($pattern, $content, $matches)) {
 	$uuid = $matches[1];
 	echo "UUID trouvé : $uuid\r\n";
+	$token = $matches[2];
+	echo "TOKEN trouvé :$token\r\n";
 } else {
-	echo "Aucun UUID Garmin LiveTrack trouvée.";
+	echo "Aucun UUID,TOKEN Garmin LiveTrack trouvée.";
 	exit(1);
 }
 
-$pattern0 = '#des mises =C3=A0 jour Livetrack de ([0-9a-zA-Z]*) \.#i';
+$pattern0 = '#des mises =C3=A0 jour Livetrack de ([0-9a-zA-Z]*) *\.#i';
 //$pattern1 = '#>Invitation de ([0-9a-zA-Z]*)</div>#i';
 if (preg_match($pattern0, $content, $matches)) {
 //} else if (preg_match($pattern1, $content, $matches)) {	i
@@ -47,6 +49,6 @@ $user = strtolower($matches[1]);
 echo "User trouvé : $user\r\n";
 
 #if (!isset($store->uuids)) $store->uuids = [];
-$uuids->$user = $uuid;
+$uuids->$user = ['uuid' => $uuid, 'token' => $token];
 
 ?>

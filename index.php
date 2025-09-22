@@ -35,7 +35,8 @@ if (isset($name)) {
 		echo "Access denied!";
 		exit(0);
 	}
-	$uuid = $uuids->$name;
+	$uuid = $uuids->$name['uuid'];
+	$token = $uuids->$name['token'];
 }
 
 if (isset($uuid)) {
