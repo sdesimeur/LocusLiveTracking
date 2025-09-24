@@ -117,8 +117,8 @@ if (isset($uuid)) {
 		$objstr = preg_replace('/\$/', '', $matches[1]);
 		//$objstr = $matches[1];
 		//echo prettyPrint($objstr) . "\n";
-		$json = json_decode($objstr, $associative = true, $flags = 0 /*JSON_THROW_ON_ERROR*/);
-		echo 'Last error: ', json_last_error_msg(), PHP_EOL, PHP_EOL;
+		$json = json_decode($objstr, $associative = true);
+		echo 'Last error: ' . json_last_error_msg() . "\n";
 		var_dump($json);
 		//$gpx = file_get_contents("test.gpx");
 	
