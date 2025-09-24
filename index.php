@@ -1,8 +1,14 @@
 <?php
 
-include('./admin/parameters.php');
-include($_SERVER['DOCUMENT_ROOT'] . $directory_pass . 'database/access.php');
+if (!isset($_SERVER["HTTP_HOST"])) {
+  parse_str($argv[1], $_GET);
+  parse_str($argv[1], $_POST);
+}
 
+include('./admin/parameters.php');
+//include($_SERVER['DOCUMENT_ROOT'] . $directory_pass . 'database/access.php');
+include($directory_pass . 'database/access.php');
+//include('./database/access.php');
 if (isset($_GET['pass'])) {
 	// Extraire et nettoyer le contenu de la variable
 	$pass = $_GET['pass'];
@@ -42,10 +48,10 @@ if (isset($name)) {
 if (isset($uuid)) {
 	if (preg_match('/[0-9a-fA-F\-]{36}/', $uuid, $matches)) {
 		$uuid = $matches[0];
-		$url = "https://livetrack.garmin.com/services/session/" . $uuid . "/trackpoints";
+		$url = "https://livetrack.garmin.com/session/" . $uuid . "/token/" . $token;
+		#$url = "https://livetrack.garmin.com/services/session/" . $uuid . "/trackpoints";
 		// Utiliser file_get_contents pour récupérer le contenu de l'URL
 		$json = file_get_contents($url);
-		
 		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/tmp/garmin.txt', serialize($json));
 		//$gpx = file_get_contents("test.gpx");
 	
