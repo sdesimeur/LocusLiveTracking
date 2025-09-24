@@ -45,14 +45,81 @@ if (isset($name)) {
 	$token = $uuids->$name['token'];
 }
 
+function prettyPrint( $json )
+{
+    $result = '';
+    $level = 0;
+    $in_quotes = false;
+    $in_escape = false;
+    $ends_line_level = NULL;
+    $json_length = strlen( $json );
+
+    for( $i = 0; $i < $json_length; $i++ ) {
+        $char = $json[$i];
+        $new_line_level = NULL;
+        $post = "";
+        if( $ends_line_level !== NULL ) {
+            $new_line_level = $ends_line_level;
+            $ends_line_level = NULL;
+        }
+        if ( $in_escape ) {
+            $in_escape = false;
+        } else if( $char === '"' ) {
+            $in_quotes = !$in_quotes;
+        } else if( ! $in_quotes ) {
+            switch( $char ) {
+                case '}': case ']':
+                    $level--;
+                    $ends_line_level = NULL;
+                    $new_line_level = $level;
+                    break;
+
+                case '{': case '[':
+                    $level++;
+                case ',':
+                    $ends_line_level = $level;
+                    break;
+
+                case ':':
+                    $post = " ";
+                    break;
+
+                case " ": case "\t": case "\n": case "\r":
+                    $char = "";
+                    $ends_line_level = $new_line_level;
+                    $new_line_level = NULL;
+                    break;
+            }
+        } else if ( $char === '\\' ) {
+            $in_escape = true;
+        }
+        if( $new_line_level !== NULL ) {
+            $result .= "\n".str_repeat( "\t", $new_line_level );
+        }
+        $result .= $char.$post;
+    }
+
+    return $result;
+}
+
 if (isset($uuid)) {
 	if (preg_match('/[0-9a-fA-F\-]{36}/', $uuid, $matches)) {
 		$uuid = $matches[0];
 		$url = "https://livetrack.garmin.com/session/" . $uuid . "/token/" . $token;
 		#$url = "https://livetrack.garmin.com/services/session/" . $uuid . "/trackpoints";
 		// Utiliser file_get_contents pour récupérer le contenu de l'URL
-		$json = file_get_contents($url);
+		//$json = file_get_contents($url);
+		$html = file_get_contents($url);
 		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/tmp/garmin.txt', serialize($json));
+		$html = str_replace('\\', '', $html);
+		$pattern = '#^.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*$#';
+		preg_match($pattern, $html, $matches);
+		$objstr = preg_replace('/\$/', '', $matches[1]);
+		//$objstr = $matches[1];
+		//echo prettyPrint($objstr) . "\n";
+		$json = json_decode($objstr, $associative = true, $flags = 0 /*JSON_THROW_ON_ERROR*/);
+		echo 'Last error: ', json_last_error_msg(), PHP_EOL, PHP_EOL;
+		var_dump($json);
 		//$gpx = file_get_contents("test.gpx");
 	
 		if ($json == false) {
