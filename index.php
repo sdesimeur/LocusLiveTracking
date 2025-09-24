@@ -114,9 +114,12 @@ if (isset($uuid)) {
 		$html = str_replace('\\', '', $html);
 		$pattern = '#^.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*$#';
 		preg_match($pattern, $html, $matches);
-		$objstr = preg_replace('/\$/', '', $matches[1]);
+		$objstr = str_replace('$', '', $matches[1]);
+		$objstr = str_replace('null', '', $objstr);
 		//$objstr = $matches[1];
 		//echo prettyPrint($objstr) . "\n";
+		$objstr = preg_replace('/[[:^print:]]/', '', $objstr);
+		//$objstr = mb_convert_encoding($objstr, "UTF-8");
 		$json = json_decode($objstr, $associative = true);
 		echo 'Last error: ' . json_last_error_msg() . "\n";
 		var_dump($json);
