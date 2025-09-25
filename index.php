@@ -1,14 +1,16 @@
 <?php
-
-if (!isset($_SERVER["HTTP_HOST"])) {
-  parse_str($argv[1], $_GET);
-  parse_str($argv[1], $_POST);
-}
-
 include('./admin/parameters.php');
 //include($_SERVER['DOCUMENT_ROOT'] . $directory_pass . 'database/access.php');
 include($directory_pass . 'database/access.php');
 //include('./database/access.php');
+
+if (!isset($_SERVER["HTTP_HOST"])) {
+  parse_str($argv[1], $_GET);
+  parse_str($argv[1], $_POST);
+  $_SERVER['DOCUMENT_ROOT'] = "$HOME";
+  $url = "$HOME/tmp/garmin_test.html";
+}
+
 if (isset($_GET['pass'])) {
 	// Extraire et nettoyer le contenu de la variable
 	$pass = $_GET['pass'];
@@ -105,31 +107,32 @@ function prettyPrint( $json )
 if (isset($uuid)) {
 	if (preg_match('/[0-9a-fA-F\-]{36}/', $uuid, $matches)) {
 		$uuid = $matches[0];
-		$url = "https://livetrack.garmin.com/session/" . $uuid . "/token/" . $token;
-		#$url = "https://livetrack.garmin.com/services/session/" . $uuid . "/trackpoints";
-		// Utiliser file_get_contents pour récupérer le contenu de l'URL
-		//$json = file_get_contents($url);
+		if (! isset($url))
+		{
+			$url = "https://livetrack.garmin.com/session/" . $uuid . "/token/" . $token;
+			#$url = "https://livetrack.garmin.com/services/session/" . $uuid . "/trackpoints";
+			// Utiliser file_get_contents pour récupérer le contenu de l'URL
+			//$json = file_get_contents($url);
+		}
 		$html = file_get_contents($url);
-		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/tmp/garmin.txt', serialize($json));
-		$html = str_replace('\\', '', $html);
-		$pattern = '#^.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*$#';
-		preg_match($pattern, $html, $matches);
-		$objstr = str_replace('$', '', $matches[1]);
-		$objstr = str_replace('null', '', $objstr);
-		//$objstr = $matches[1];
-		//echo prettyPrint($objstr) . "\n";
-		$objstr = preg_replace('/[[:^print:]]/', '', $objstr);
-		//$objstr = mb_convert_encoding($objstr, "UTF-8");
-		$json = json_decode($objstr, $associative = true);
-		echo 'Last error: ' . json_last_error_msg() . "\n";
-		var_dump($json);
-		//$gpx = file_get_contents("test.gpx");
+		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/tmp/garmin.txt', $html);
 	
-		if ($json == false) {
+		if ($html == false || $html == NULL) {
 				echo "No download";
 		} else {
+			$html = str_replace('\\', '', $html);
+			$pattern = '#^.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*$#';
+			preg_match($pattern, $html, $matches);
+			$json = str_replace('$', '', $matches[1]);
+			$json = str_replace('null', '', $json);
+			//$objstr = $matches[1];
+			//echo prettyPrint($objstr) . "\n";
+			$json = preg_replace('/[[:^print:]]/', '', $json);
+			//$objstr = mb_convert_encoding($objstr, "UTF-8");
+			$data = json_decode($json, $associative = true);
+			echo 'Last error: ' . json_last_error_msg() . "\n";
+			var_dump($data);
 			$words = $datas->words;
-			$data = json_decode($json, true);
 			$gpx = new SimpleXMLElement('<gpx version="1.1"  xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpxtrkx="http://www.garmin.com/xmlschemas/TrackStatsExtension/v1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v2" xmlns:locus="http://www.locusmap.eu"></gpx>');
 			// Ajouter une trace (trk)
 			$namespace_locus = 'http://www.locusmap.eu';
