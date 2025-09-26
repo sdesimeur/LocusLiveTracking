@@ -104,6 +104,13 @@ function prettyPrint( $json )
     return $result;
 }
 
+function remove_utf8_bom($text)
+{
+    $bom = pack('H*','EFBBBF');
+    $text = preg_replace("/^$bom/", '', $text);
+    return $text;
+}
+
 if (isset($uuid)) {
 	if (preg_match('/[0-9a-fA-F\-]{36}/', $uuid, $matches)) {
 		$uuid = $matches[0];
@@ -123,14 +130,29 @@ if (isset($uuid)) {
 			$html = str_replace('\\', '', $html);
 			$pattern = '#^.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*$#';
 			preg_match($pattern, $html, $matches);
-			$json = str_replace('$', '', $matches[1]);
-			$json = str_replace('null', '', $json);
-			//$objstr = $matches[1];
-			//echo prettyPrint($objstr) . "\n";
+			$json = $matches[1];
+			echo $json;
+			exit;
+			$json = preg_replace('/[[:cntrl:]]/', '', $json);
+			$json = str_replace(array('NULL', 'null'), '""', $json);
+			$json = str_replace(array("\t", "\n"), ' ', $json);
+			$json = str_replace("'", '"', $json);
+			$json = str_replace('NULL', '""', $json);
+			$json = str_replace("\0", '', $json);
+			$json = preg_replace( "/\p{Cc}*$/u", "", $json);
+			$json = str_replace("\\", "", $json);
+			$json = remove_utf8_bom($json);
+			$json = stripslashes(html_entity_decode($json));
+			$json = str_replace('$', '', $json);
 			$json = preg_replace('/[[:^print:]]/', '', $json);
-			//$objstr = mb_convert_encoding($objstr, "UTF-8");
-			$data = json_decode($json, $associative = true);
-			echo 'Last error: ' . json_last_error_msg() . "\n";
+			//$json = mb_convert_encoding($json, "UTF-8");
+			$json = html_entity_decode($json);
+			$json = urldecode($json);
+			$data = json_decode($json, $associative = true, $depth = 1024);
+			//echo prettyPrint($objstr) . "\n";
+			//echo $json . "\n";
+			echo json_last_error();
+			echo json_last_error_msg();
 			var_dump($data);
 			$words = $datas->words;
 			$gpx = new SimpleXMLElement('<gpx version="1.1"  xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpxtrkx="http://www.garmin.com/xmlschemas/TrackStatsExtension/v1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v2" xmlns:locus="http://www.locusmap.eu"></gpx>');
