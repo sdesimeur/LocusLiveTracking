@@ -7,6 +7,7 @@ import https from 'https';
 import fs from 'fs'
 import fetch from 'node-fetch';
 import {inspect} from "util";
+import { uuids } from "./database/uuids";
 
 const hostname = '0.0.0.0';
 const port_http = 3000;
@@ -15,10 +16,23 @@ const port_https = 3443;
 
 function serve (req: http.IncomingMessage, res: http.ServerResponse)
 {
-  console.log(inspect(req));
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'text/plain');
-  res.end('Hello, world!');
+  console.log(inspect(req.url));
+  switch (req.url)
+  {
+    case "/admin/upload":
+      console.log(inspect(req.url));
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/plain');
+      console.log("Current directory:", __dirname);
+      res.write(inspect(uuids["clement"]) + "\n");
+      res.end('Hello, world!\n');
+      break;
+    default:
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/plain');
+      res.end('Wrong query!\n');
+      break;
+  }
 }
 
 var options: https.ServerOptions = {
