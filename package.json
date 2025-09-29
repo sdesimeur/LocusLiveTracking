@@ -1,0 +1,42 @@
+{
+  "dependencies": {
+    "@types/http-server": "^0.12.4",
+    "fs": "^0.0.1-security",
+    "fs-extra": "^11.3.2",
+    "http": "^0.0.1-security",
+    "http-server": "^14.1.1",
+    "https": "^1.0.0",
+    "net": "^1.0.2",
+    "node-fetch": "^3.3.2",
+    "util": "^0.12.5"
+  },
+  "name": "locuslivetracking",
+  "version": "1.0.0",
+  "description": "Turn livetracking datas from several sources to a LocusMap livetracking",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.5.2",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/app.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/null/LocusLiveTracking.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/null/LocusLiveTracking/issues"
+  },
+  "homepage": "https://github.com/null/LocusLiveTracking#readme"
+}
