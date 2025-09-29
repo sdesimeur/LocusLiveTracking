@@ -18,10 +18,30 @@ let handlePath = {
 }
 let handleFunction: {[key: string]: MyFunc} = {
 	upload: (req: MyIncomingMessage, res: ServerResponse) => {
-		res.statusCode = 200;
-		res.setHeader('Content-Type', 'text/plain');
-		res.write(inspect(uuids["clement"]) + "\n");
-		res.end('Hello, world!\n');
+		let body = '';
+		req.on('data', (chunk) => {
+        		body += chunk;
+    		});
+    		req.on('end', () => {
+			const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
+
+			body = body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
+			const tmp0 = body.match(expreg0);
+        		var uuid = tmp0[1];
+        		var token = tmp0[2];
+			const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
+			const tmp1 = body.match(expreg1);
+        		var name = tmp1[1];
+			var data = {};
+			data[name] = {};
+			data[name]['uuid'] = uuid;
+			data[name]['token'] = token;
+			console.log(inspect(data));
+			res.statusCode = 200;
+			res.setHeader('Content-Type', 'text/plain');
+			res.write(inspect(data) + "\n");
+			res.end('Mail handled!\n');
+		});
 	},
 }
 

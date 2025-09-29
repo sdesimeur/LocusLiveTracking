@@ -25,7 +25,6 @@ function serve (req: MyIncomingMessage, res: ServerResponse) {
 	switch (root)
 	{
 		case "LocusLiveTracking":
-		console.log(inspect(req.urlTab));
 			LocusLiveTracking.handle(req, res);
 			break;
 		default:
