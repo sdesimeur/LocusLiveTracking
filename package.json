@@ -8,6 +8,7 @@
     "https": "^1.0.0",
     "net": "^1.0.2",
     "node-fetch": "^3.3.2",
+    "node-localstorage": "^3.0.5",
     "util": "^0.12.5"
   },
   "name": "locuslivetracking",

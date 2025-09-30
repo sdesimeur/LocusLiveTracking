@@ -1,7 +1,10 @@
-import { uuids } from "./database/uuids";
+//import { uuids } from "./database/uuids";
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse } from "./Common"
+import { LocalStorage } from 'node-localstorage';
+import fs from 'fs'
 
+var uuidStorage = undefined;
 
 type MyTree = { [key: string]: (string | Object) };
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
@@ -24,23 +27,35 @@ let handleFunction: {[key: string]: MyFunc} = {
     		});
     		req.on('end', () => {
 			const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
-
 			body = body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
 			const tmp0 = body.match(expreg0);
-        		var uuid = tmp0[1];
-        		var token = tmp0[2];
-			const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
-			const tmp1 = body.match(expreg1);
-        		var name = tmp1[1];
-			var data = {};
-			data[name] = {};
-			data[name]['uuid'] = uuid;
-			data[name]['token'] = token;
-			console.log(inspect(data));
-			res.statusCode = 200;
-			res.setHeader('Content-Type', 'text/plain');
-			res.write(inspect(data) + "\n");
-			res.end('Mail handled!\n');
+			if (tmp0.length < 2) {
+				console.log(tmp0.length)
+				noHandlePath(req, res);
+			} else {
+	        		var uuid = tmp0[1];
+	        		var token = tmp0[2];
+				const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
+				const tmp1 = body.match(expreg1);
+				if (tmp1.length < 1)
+				{
+					console.log(tmp1.length)
+					noHandlePath(req, res);
+				} else {
+		        		var name = tmp1[2];
+					//fs.unlinkSync('./database/uuids');
+					uuidStorage = new LocalStorage('./database/uuids');
+					var uuids = {}
+					uuids[name] = {};
+					uuids[name]['uuid'] = uuid;
+					uuids[name]['token'] = token;
+					uuidStorage = uuids;
+					res.statusCode = 200;
+					res.setHeader('Content-Type', 'text/plain');
+					res.write(inspect(uuids) + "\n");
+					res.end('Mail handled!\n');
+				}
+			}
 		});
 	},
 }
