@@ -10,6 +10,10 @@ import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse, ServerOptions } from "./Common"
 import * as LocusLiveTracking from "./LocusLiveTracking";
 
+
+const tls = require('tls');
+tls.DEFAULT_MIN_VERSION = 'TLSv1.2';
+
 type Server = http.Server;
 const createServer = http.createServer;
 

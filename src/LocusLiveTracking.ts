@@ -1,13 +1,27 @@
 //import { uuids } from "./database/uuids";
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse } from "./Common"
-import { LocalStorage } from 'node-localstorage';
 import fs from 'fs'
+import { getAllValues, getValue, setValue } from "node-global-storage";
 
 var uuidStorage = undefined;
 
+class MyMap<K, V> extends Map <K, V> {
+	set(key: K, value: V): this {
+		super.set(key, value);
+		return this;
+	}
+}
+
+
+type OneUuidData = {uuid: string, token: string};
+//type UuidsDatas = Record<string, OneUuidData>;
+type UuidsDatas = MyMap<string, OneUuidData>;
 type MyTree = { [key: string]: (string | Object) };
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
+
+//var uuids: UuidsDatas = new Map<string, OneUuidData>();
+var uuids: UuidsDatas = new MyMap();
 
 function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 	res.statusCode = 404;
@@ -42,22 +56,28 @@ let handleFunction: {[key: string]: MyFunc} = {
 					console.log(tmp1.length)
 					noHandlePath(req, res);
 				} else {
-		        		var name = tmp1[2];
+		        		var name = tmp1[1];
 					//fs.unlinkSync('./database/uuids');
-					uuidStorage = new LocalStorage('./database/uuids');
-					var uuids = {}
-					uuids[name] = {};
-					uuids[name]['uuid'] = uuid;
-					uuids[name]['token'] = token;
-					uuidStorage = uuids;
+					//console.log(name + "\n");
+				       	uuids.set(name, {uuid: uuid, token: token});
+					setValue<UuidsDatas>('uuids', uuids);
 					res.statusCode = 200;
 					res.setHeader('Content-Type', 'text/plain');
-					res.write(inspect(uuids) + "\n");
+					//res.write(name + "\n");
+					//res.write(inspect(uuids.get(name)) + "\n");
 					res.end('Mail handled!\n');
 				}
 			}
 		});
 	},
+	main: (req: MyIncomingMessage, res: ServerResponse) => {
+		var uuids = getAllValues();
+		res.statusCode = 200;
+		res.setHeader('Content-Type', 'text/plain');
+		res.write(inspect(uuids) + "\n");
+		res.end('Mail handled!\n');
+
+	}
 }
 
 function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) {
