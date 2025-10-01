@@ -9,6 +9,8 @@ var uuidStorage = undefined;
 class MyMap<K, V> extends Map <K, V> {
 	set(key: K, value: V): this {
 		super.set(key, value);
+		const txt: string = JSON.stringify(Object.fromEntries(this));
+		fs.writeFileSync('./database/datas.json', txt, {encoding :'utf8', flag: 'w', flush: true});
 		return this;
 	}
 }
@@ -21,8 +23,14 @@ type MyTree = { [key: string]: (string | Object) };
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
-var uuids: UuidsDatas = new MyMap();
-
+var dataTxt: string;
+var datas: UuidsDatas = new MyMap<string, OneUuidData>();
+if (fs.existsSync('./database/datas.json')) {
+	dataTxt = fs.readFileSync('./database/datas.json', 'utf8');
+	if (dataTxt !== undefined) {
+		datas = new MyMap<string, OneUuidData>(Object.entries(JSON.parse(dataTxt)));
+	}
+}
 function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 	res.statusCode = 404;
 	res.setHeader('Content-Type', 'text/plain');
@@ -59,8 +67,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 		        		var name = tmp1[1];
 					//fs.unlinkSync('./database/uuids');
 					//console.log(name + "\n");
-				       	uuids.set(name, {uuid: uuid, token: token});
-					setValue<UuidsDatas>('uuids', uuids);
+				       	datas.set(name, {uuid: uuid, token: token});
+					setValue<UuidsDatas>('uuids', datas);
 					res.statusCode = 200;
 					res.setHeader('Content-Type', 'text/plain');
 					//res.write(name + "\n");
@@ -71,10 +79,9 @@ let handleFunction: {[key: string]: MyFunc} = {
 		});
 	},
 	main: (req: MyIncomingMessage, res: ServerResponse) => {
-		var uuids = getAllValues();
 		res.statusCode = 200;
 		res.setHeader('Content-Type', 'text/plain');
-		res.write(inspect(uuids) + "\n");
+		res.write(inspect(datas) + "\n");
 		res.end('Mail handled!\n');
 
 	}
