@@ -2,9 +2,10 @@
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse } from "./Common"
 import fs from 'fs'
-import { getAllValues, getValue, setValue } from "node-global-storage";
-
-var uuidStorage = undefined;
+//import { getAllValues, getValue, setValue } from "node-global-storage";
+const url = require('url');
+const bodyParser = require('body-parser');
+const querystring = require('querystring');
 
 class MyMap<K, V> extends Map <K, V> {
 	set(key: K, value: V): this {
@@ -15,16 +16,15 @@ class MyMap<K, V> extends Map <K, V> {
 	}
 }
 
-
 type OneUuidData = {uuid: string, token: string};
 //type UuidsDatas = Record<string, OneUuidData>;
-type UuidsDatas = MyMap<string, OneUuidData>;
+type UuidsDatas = MyMap<string, (OneUuidData|string)>;
 type MyTree = { [key: string]: (string | Object) };
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
 var dataTxt: string;
-var datas: UuidsDatas = new MyMap<string, OneUuidData>();
+var datas: UuidsDatas = new MyMap<string, (OneUuidData|string)>();
 if (fs.existsSync('./database/datas.json')) {
 	dataTxt = fs.readFileSync('./database/datas.json', 'utf8');
 	if (dataTxt !== undefined) {
@@ -38,9 +38,12 @@ function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 }
 let handlePath = {
 	admin : {
-		upload: undefined
-	}
+		upload: null,
+		pass: null,
+	},
+	main : null,
 }
+
 let handleFunction: {[key: string]: MyFunc} = {
 	upload: (req: MyIncomingMessage, res: ServerResponse) => {
 		let body = '';
@@ -65,15 +68,11 @@ let handleFunction: {[key: string]: MyFunc} = {
 					noHandlePath(req, res);
 				} else {
 		        		var name = tmp1[1];
-					//fs.unlinkSync('./database/uuids');
-					//console.log(name + "\n");
 				       	datas.set(name, {uuid: uuid, token: token});
-					setValue<UuidsDatas>('uuids', datas);
 					res.statusCode = 200;
 					res.setHeader('Content-Type', 'text/plain');
-					//res.write(name + "\n");
-					//res.write(inspect(uuids.get(name)) + "\n");
-					res.end('Mail handled!\n');
+					res.write("Mail handled !");
+					res.end("\n");
 				}
 			}
 		});
@@ -81,32 +80,85 @@ let handleFunction: {[key: string]: MyFunc} = {
 	main: (req: MyIncomingMessage, res: ServerResponse) => {
 		res.statusCode = 200;
 		res.setHeader('Content-Type', 'text/plain');
-		res.write(inspect(datas) + "\n");
-		res.end('Mail handled!\n');
-
+		res.write(inspect(datas));
+		res.end('\n');
+	},
+	pass: (req: MyIncomingMessage, res: ServerResponse) => {
+		res.statusCode = 200;
+		res.setHeader('Content-Type', 'text/html');
+		const pass = req.queryDatas.get('pass');
+		if (pass !== undefined && pass !== null)
+		{
+			res.write("Password changed!");
+			datas.set('pass', pass);
+		} else {
+			res.write("No password found!");
+		}
+		res.end('\n');
+/*
+	<html lang="fr">
+	<head>
+		<meta charset="UTF-8">
+		<title>Demande d'Identifiant</title>
+	</head>
+	<body>
+		<h1>Veuillez entrer votre pass</h1>
+		<!-- Le formulaire HTML pour entrer l'pass -->
+		<form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+			<label for="pass">Password:</label>
+			<input type="text" id="pass" name="pass" required>
+			<button type="submit">Envoyer</button>
+		</form>
+	</body>
+	</html>
+*/
 	}
 }
 
 function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) {
-		if (req.urlTab.length === 0) {
-			noHandlePath(req, res);
-		}
-		const nextPath = req.urlTab.shift().toString();
-		if (path[nextPath] !== undefined) {
+	if (req.urlTab.length === 0) {
+		noHandlePath(req, res);
+	}
+	const nextPath = req.urlTab.shift().split('?')[0].toString();
+	if (path[nextPath] === undefined) {
+		noHandlePath(req, res);
+	} else {
+		const func: MyFunc = handleFunction[nextPath];
+		if (func === undefined) {
 			handleNext(req, res, path[nextPath]);
 		} else {
-			const func: MyFunc = handleFunction[nextPath];
-			if (func === undefined) {
-				noHandlePath(req, res);
-			} else {
-				func(req, res);
-			}
+			func(req, res);
 		}
 	}
-	
+}
+
 //export default module "LocusLiveTracking" {
 export function handle (req: MyIncomingMessage, res: ServerResponse) {
+	let body = '';
+	req.on('data', (chunk) => {
+        	body += chunk;
+    	});
+    	req.on('end', () => {
+		//console.log(inspect(req));
+		var pass: string = undefined;
+		req.queryDatas = new Map<string, string>();
+		const urlDatas = url.parse(req.url);
+		if (urlDatas.query !== undefined && urlDatas.query !== null) {
+			//const temp = querystring.parse(urlDatas.query);
+			const temp = new URLSearchParams(urlDatas.query);
+			console.log(inspect(temp));
+			for (const [key, value] of temp.entries()) {
+				req.queryDatas.set(key, value);
+			}
+		}
+		//if (req.method === "POST") {
+			const temp = new URLSearchParams(body);
+			for (const [key, value] of temp.entries()) {
+					req.queryDatas.set(key, value);
+			}
+		//}
 		handleNext(req, res, handlePath);
-	}
+	});
+}
 //}
 module.exports = { handle };

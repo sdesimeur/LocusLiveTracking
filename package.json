@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@types/http-server": "^0.12.4",
+    "body-parser": "^2.2.0",
     "fs": "^0.0.1-security",
     "fs-extra": "^11.3.2",
     "http": "^0.0.1-security",
