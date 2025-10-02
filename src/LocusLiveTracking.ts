@@ -31,6 +31,22 @@ if (fs.existsSync('./database/datas.json')) {
 		datas = new MyMap<string, OneUuidData>(Object.entries(JSON.parse(dataTxt)));
 	}
 }
+
+function returnKeyValObj(arr:Array<string>){
+	if (!Array.isArray(arr) || arr.length < 2) return false;
+	let propKey = '';
+	const formDataEntries: {[key:string]:string} = {};
+	const [pKey, ...pValArray] = arr;
+	// pValArray[0] ends with \r\n (2 characters total)
+	const propVal = pValArray[0].slice(0,-2)
+	// pKey looks like '\r\nname=\"key\"', where \r and \n and \" count as one character each
+	// So, need to remove 8 from start of pKey and 1 from end of pKey
+	if (pKey && pKey.includes('name=\"')) propKey = pKey.slice(8).slice(0,-1);
+	if (propKey) formDataEntries[propKey] = propVal;
+	if (Object.keys(formDataEntries).length) return formDataEntries;
+	return false;
+}
+
 function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 	res.statusCode = 404;
 	res.setHeader('Content-Type', 'text/plain');
@@ -127,6 +143,15 @@ function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) 
 		if (func === undefined) {
 			handleNext(req, res, path[nextPath]);
 		} else {
+			if (func !== handleFunction['pass'])
+			{
+				if (req.queryDatas.get('pass') != datas.get('pass')) {
+					res.statusCode = 404;
+					res.setHeader('Content-Type', 'text/plain');
+					res.end('Wrong password!\n');
+					return;
+				}
+			}
 			func(req, res);
 		}
 	}
@@ -146,16 +171,32 @@ export function handle (req: MyIncomingMessage, res: ServerResponse) {
 		if (urlDatas.query !== undefined && urlDatas.query !== null) {
 			//const temp = querystring.parse(urlDatas.query);
 			const temp = new URLSearchParams(urlDatas.query);
-			console.log(inspect(temp));
 			for (const [key, value] of temp.entries()) {
 				req.queryDatas.set(key, value);
 			}
 		}
 		//if (req.method === "POST") {
+		const headerContentType = req.headers['content-type'];
+		if (headerContentType !== undefined && headerContentType.startsWith('multipart/form-data'))
+		{
+			const contentTypeHeader = req.headers["content-type"];
+      			const boundary = "--" + contentTypeHeader.split("; ")[1].replace("boundary=","");
+			const bodyParts = body.split(boundary);
+			bodyParts.forEach((val:string) => {
+          			// After name=.. there are 2 \r\n before the value - that's the only split I want
+          			// So, the regex below splits at the first occurance of \r\n\r\n, and that's it
+          			// This way, newlines inside texarea inputs are preserved
+				const arrayStr = val.replace("Content-Disposition: form-data; ","").split(/\r\n\r\n(.*)/s);
+				console.log(inspect(arrayStr));
+				const formDataEntry = returnKeyValObj(arrayStr);
+          			//if (formDataEntry) Object.assign(formDataSubmitted, formDataEntry);
+			});
+		} else {
 			const temp = new URLSearchParams(body);
 			for (const [key, value] of temp.entries()) {
-					req.queryDatas.set(key, value);
+				req.queryDatas.set(key, value);
 			}
+		}
 		//}
 		handleNext(req, res, handlePath);
 	});
