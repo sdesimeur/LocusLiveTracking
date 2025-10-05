@@ -1,11 +1,14 @@
 //import { uuids } from "./database/uuids";
 import { inspect } from "util";
-import { MyIncomingMessage, ServerResponse } from "./Common"
-import fs from 'fs'
+import { MyIncomingMessage, ServerResponse, MyTree } from "./Common";
+import fs from 'fs';
+import { htpasswd } from "./htpasswd";
+
 //import { getAllValues, getValue, setValue } from "node-global-storage";
 const url = require('url');
 const bodyParser = require('body-parser');
 const querystring = require('querystring');
+const multipart = require('parse-multipart-data');
 
 class MyMap<K, V> extends Map <K, V> {
 	set(key: K, value: V): this {
@@ -19,7 +22,6 @@ class MyMap<K, V> extends Map <K, V> {
 type OneUuidData = {uuid: string, token: string};
 //type UuidsDatas = Record<string, OneUuidData>;
 type UuidsDatas = MyMap<string, (OneUuidData|string)>;
-type MyTree = { [key: string]: (string | Object) };
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
@@ -32,26 +34,18 @@ if (fs.existsSync('./database/datas.json')) {
 	}
 }
 
-function returnKeyValObj(arr:Array<string>){
-	if (!Array.isArray(arr) || arr.length < 2) return false;
-	let propKey = '';
-	const formDataEntries: {[key:string]:string} = {};
-	const [pKey, ...pValArray] = arr;
-	// pValArray[0] ends with \r\n (2 characters total)
-	const propVal = pValArray[0].slice(0,-2)
-	// pKey looks like '\r\nname=\"key\"', where \r and \n and \" count as one character each
-	// So, need to remove 8 from start of pKey and 1 from end of pKey
-	if (pKey && pKey.includes('name=\"')) propKey = pKey.slice(8).slice(0,-1);
-	if (propKey) formDataEntries[propKey] = propVal;
-	if (Object.keys(formDataEntries).length) return formDataEntries;
-	return false;
-}
-
 function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 	res.statusCode = 404;
 	res.setHeader('Content-Type', 'text/plain');
 	res.end('Wrong query!\n');
 }
+
+function badAuthentication (req: MyIncomingMessage, res: ServerResponse) {
+	res.statusCode = 401;
+	res.setHeader('Content-Type', 'text/plain');
+	res.end('Bad Authentication!\n');
+}
+
 let handlePath = {
 	admin : {
 		upload: null,
@@ -62,36 +56,40 @@ let handlePath = {
 
 let handleFunction: {[key: string]: MyFunc} = {
 	upload: (req: MyIncomingMessage, res: ServerResponse) => {
-		let body = '';
-		req.on('data', (chunk) => {
-        		body += chunk;
-    		});
-    		req.on('end', () => {
-			const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
-			body = body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
-			const tmp0 = body.match(expreg0);
-			if (tmp0.length < 2) {
-				console.log(tmp0.length)
+		var header = req.headers.authorization || '';
+		var token = header.split(/\s+/).pop() || '';
+		var auth = Buffer.from(token, 'base64').toString(); // convert from base64
+		var parts = auth.split(/:/);                        // split on colon
+		var username = parts.shift();                       // username is first
+		var password = parts.join(':');                     // everything else is the password
+		if (username !== htpasswd[0].username || password !== htpasswd[0].password) {
+			badAuthentication(req, res);
+			return;
+		}
+		const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
+		req.body = req.body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
+		const tmp0 = req.body.match(expreg0);
+		if (tmp0.length < 2) {
+			console.log(tmp0.length)
+			noHandlePath(req, res);
+		} else {
+        		var uuid = tmp0[1];
+        		var token = tmp0[2];
+			const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
+			const tmp1 = req.body.match(expreg1);
+			if (tmp1.length < 1)
+			{
+				console.log(tmp1.length)
 				noHandlePath(req, res);
 			} else {
-	        		var uuid = tmp0[1];
-	        		var token = tmp0[2];
-				const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
-				const tmp1 = body.match(expreg1);
-				if (tmp1.length < 1)
-				{
-					console.log(tmp1.length)
-					noHandlePath(req, res);
-				} else {
-		        		var name = tmp1[1];
-				       	datas.set(name, {uuid: uuid, token: token});
-					res.statusCode = 200;
-					res.setHeader('Content-Type', 'text/plain');
-					res.write("Mail handled !");
-					res.end("\n");
-				}
+	        		var name = tmp1[1];
+			       	datas.set(name, {uuid: uuid, token: token});
+				res.statusCode = 200;
+				res.setHeader('Content-Type', 'text/plain');
+				res.write("Mail handled !");
+				res.end("\n");
 			}
-		});
+		}
 	},
 	main: (req: MyIncomingMessage, res: ServerResponse) => {
 		res.statusCode = 200;
@@ -143,7 +141,7 @@ function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) 
 		if (func === undefined) {
 			handleNext(req, res, path[nextPath]);
 		} else {
-			if (func !== handleFunction['pass'])
+			if (func !== handleFunction['pass'] && func !== handleFunction['upload'])
 			{
 				if (req.queryDatas.get('pass') != datas.get('pass')) {
 					res.statusCode = 404;
@@ -159,9 +157,9 @@ function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) 
 
 //export default module "LocusLiveTracking" {
 export function handle (req: MyIncomingMessage, res: ServerResponse) {
-	let body = '';
+	req.body = '';
 	req.on('data', (chunk) => {
-        	body += chunk;
+        	req.body += chunk;
     	});
     	req.on('end', () => {
 		//console.log(inspect(req));
@@ -179,20 +177,14 @@ export function handle (req: MyIncomingMessage, res: ServerResponse) {
 		const headerContentType = req.headers['content-type'];
 		if (headerContentType !== undefined && headerContentType.startsWith('multipart/form-data'))
 		{
-			const contentTypeHeader = req.headers["content-type"];
-      			const boundary = "--" + contentTypeHeader.split("; ")[1].replace("boundary=","");
-			const bodyParts = body.split(boundary);
-			bodyParts.forEach((val:string) => {
-          			// After name=.. there are 2 \r\n before the value - that's the only split I want
-          			// So, the regex below splits at the first occurance of \r\n\r\n, and that's it
-          			// This way, newlines inside texarea inputs are preserved
-				const arrayStr = val.replace("Content-Disposition: form-data; ","").split(/\r\n\r\n(.*)/s);
-				console.log(inspect(arrayStr));
-				const formDataEntry = returnKeyValObj(arrayStr);
-          			//if (formDataEntry) Object.assign(formDataSubmitted, formDataEntry);
+      			const boundary = multipart.getBoundary(req.headers["content-type"]);;
+			const parts = multipart.parse(Buffer.from(req.body), boundary);
+			parts.forEach(element => {
+				req.queryDatas.set(element.name, element.data.toString());
 			});
+			
 		} else {
-			const temp = new URLSearchParams(body);
+			const temp = new URLSearchParams(req.body);
 			for (const [key, value] of temp.entries()) {
 				req.queryDatas.set(key, value);
 			}
