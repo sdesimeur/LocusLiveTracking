@@ -55,7 +55,7 @@ let handlePath = {
 }
 
 let handleFunction: {[key: string]: MyFunc} = {
-	upload: (req: MyIncomingMessage, res: ServerResponse) => {
+	upload: async (req: MyIncomingMessage, res: ServerResponse) => {
 		var header = req.headers.authorization || '';
 		var token = header.split(/\s+/).pop() || '';
 		var auth = Buffer.from(token, 'base64').toString(); // convert from base64
@@ -68,15 +68,19 @@ let handleFunction: {[key: string]: MyFunc} = {
 		}
 		const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
 		req.body = req.body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
-		const tmp0 = req.body.match(expreg0);
+		var tmp0 = req.body.match(expreg0);
+		var name: string = "";
+		var uuid: string = "";
+		var token: string = "";
 		if (tmp0.length < 2) {
 			console.log(tmp0.length)
 			noHandlePath(req, res);
+			return;
 		} else {
         		var uuid = tmp0[1];
         		var token = tmp0[2];
-			const expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
-			const tmp1 = req.body.match(expreg1);
+			var expreg1  = new RegExp('jour Livetrack de ([0-9a-zA-Z]*) *\.', 'i');
+			var tmp1 = req.body.match(expreg1);
 			if (tmp1.length < 1)
 			{
 				console.log(tmp1.length)
@@ -90,11 +94,37 @@ let handleFunction: {[key: string]: MyFunc} = {
 				res.end("\n");
 			}
 		}
+		//var name1 = req.queryDatas.get('name');
+		//var tmp2 = datas.get(name1);
+		//var uuid = tmp2['uuid'];
+		//var token = tmp2['token'];
+		var url = 'https://livetrack.garmin.com/session/' + uuid + '/token/' + token;
+		var bodyStream = await fetch(url);
+		var body = await bodyStream.text();
+		fs.writeFileSync('tmp/garmin_livetracking.txt', body);
 	},
-	main: (req: MyIncomingMessage, res: ServerResponse) => {
+	main: async (req: MyIncomingMessage, res: ServerResponse) => {
 		res.statusCode = 200;
-		res.setHeader('Content-Type', 'text/plain');
-		res.write(inspect(datas));
+		var pattern = new RegExp('.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*');
+		var url = 'tmp/garmin_livetracking.txt';
+		var body = fs.readFileSync(url, 'utf8');
+		body = body.replaceAll("= ", "").replaceAll("\n", "").replaceAll("\r", "");
+		/*
+		var bodytab = body.split('<script\s*')
+		bodytab.forEach(element => {
+			if (element.includes('trackPoints')) {
+				console.log(element);
+			}
+		})
+	        */
+		var tmp0 = body.match(pattern);
+		if (tmp0 === null || tmp0.length < 1) {
+			res.setHeader('Content-Type', 'text/plain');
+			res.write(inspect(datas));
+		} else {
+			console.log(tmp0[1]);
+			res.setHeader('Content-Type', 'application/gpx+xml');
+		}
 		res.end('\n');
 	},
 	pass: (req: MyIncomingMessage, res: ServerResponse) => {
