@@ -4,6 +4,7 @@
     "body-parser": "^2.2.0",
     "fs": "^0.0.1-security",
     "fs-extra": "^11.3.2",
+    "gpx-builder": "^5.6.0",
     "http": "^0.0.1-security",
     "http-server": "^14.1.1",
     "https": "^1.0.0",
