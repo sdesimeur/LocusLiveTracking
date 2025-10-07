@@ -10,7 +10,7 @@ const bodyParser = require('body-parser');
 const querystring = require('querystring');
 const multipart = require('parse-multipart-data');
 const { buildGPX, GarminBuilder } = require('gpx-builder');
-const { Point } = GarminBuilder.MODELS;
+const { Point, Track } = GarminBuilder.MODELS;
 
 class MyMap<K, V> extends Map <K, V> {
 	set(key: K, value: V): this {
