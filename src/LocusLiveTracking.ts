@@ -34,6 +34,25 @@ if (fs.existsSync('./database/datas.json')) {
 	}
 }
 
+function findKey(obj, target, max) {
+	var l = 0;
+	const fnd = o => {
+		l++;
+		if (l > max) return undefined;
+		for (const [k, v] of Object.entries(o)) {
+			if (k === target) {
+				return v;
+			}
+	       		if (v !== undefined && v !== null && typeof v === 'object') {
+				const f = fnd(v);
+				if (f) return f;
+			}
+		}
+		l--;
+	}
+	return fnd(obj);
+}
+
 function noHandlePath (req: MyIncomingMessage, res: ServerResponse) {
 	res.statusCode = 404;
 	res.setHeader('Content-Type', 'text/plain');
@@ -86,7 +105,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 				console.log(tmp1.length)
 				noHandlePath(req, res);
 			} else {
-	        		var name = tmp1[1];
+	        		var name = tmp1[1].toLowerCase();
 			       	datas.set(name, {uuid: uuid, token: token});
 				res.statusCode = 200;
 				res.setHeader('Content-Type', 'text/plain');
@@ -98,14 +117,14 @@ let handleFunction: {[key: string]: MyFunc} = {
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
 		res.statusCode = 200;
 		var pattern = new RegExp('.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*');
-		var name = req.queryDatas.get('name');
-		var tmp2 = datas.get(name);
-		var uuid = tmp2['uuid'];
-		var token = tmp2['token'];
+		var name = req.queryDatas.get('name').toLowerCase();
+		var tmp10 = datas.get(name);
+		var uuid = tmp10['uuid'];
+		var token = tmp10['token'];
 		var url = 'https://livetrack.garmin.com/session/' + uuid + '/token/' + token;
 		var bodyStream = await fetch(url);
 		var body = await bodyStream.text();
-		body = body.replaceAll("= ", "").replaceAll("\n", "").replaceAll("\r", "");
+		body = body.replaceAll("= ", "").replaceAll("\n", "").replaceAll("\r", "").replaceAll("\\", "");
 		//var url = 'tmp/garmin_livetracking.txt';
 		//var body = fs.readFileSync(url, 'utf8');
 		/*
@@ -118,12 +137,18 @@ let handleFunction: {[key: string]: MyFunc} = {
 	        */
 		var tmp0 = body.match(pattern);
 		if (tmp0 === null || tmp0.length < 1) {
-			fs.writeFileSync('tmp/garmin_livetracking.txt', body);
 			res.setHeader('Content-Type', 'text/plain');
-			res.write(inspect(datas));
+			res.write("tmp1 length :" + tmp0.length);
 		} else {
-			console.log(tmp0[1]);
+			fs.writeFileSync('tmp/garmin_livetracking.txt', body);
+			var tmp1 = tmp0[1].replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
+			var tmp2 = JSON.parse(tmp1);
+			var tmp3 = tmp2["state"]["queries"];
+			var tmp4 = findKey(tmp3, "trackPoints", 6);
+			fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmp4, null, 4));
 			res.setHeader('Content-Type', 'application/gpx+xml');
+			res.write("result:\n");
+			res.write(JSON.stringify(tmp4, null, 4));
 		}
 		res.end('\n');
 	},
