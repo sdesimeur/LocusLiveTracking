@@ -1,7 +1,7 @@
 //import { uuids } from "./database/uuids";
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse, MyTree } from "./Common";
-import fs from 'fs';
+import fs from 'fs-extra';
 import { htpasswd } from "./htpasswd";
 
 //import { getAllValues, getValue, setValue } from "node-global-storage";
@@ -94,21 +94,20 @@ let handleFunction: {[key: string]: MyFunc} = {
 				res.end("\n");
 			}
 		}
-		//var name1 = req.queryDatas.get('name');
-		//var tmp2 = datas.get(name1);
-		//var uuid = tmp2['uuid'];
-		//var token = tmp2['token'];
-		var url = 'https://livetrack.garmin.com/session/' + uuid + '/token/' + token;
-		var bodyStream = await fetch(url);
-		var body = await bodyStream.text();
-		fs.writeFileSync('tmp/garmin_livetracking.txt', body);
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
 		res.statusCode = 200;
 		var pattern = new RegExp('.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*');
-		var url = 'tmp/garmin_livetracking.txt';
-		var body = fs.readFileSync(url, 'utf8');
+		var name = req.queryDatas.get('name');
+		var tmp2 = datas.get(name);
+		var uuid = tmp2['uuid'];
+		var token = tmp2['token'];
+		var url = 'https://livetrack.garmin.com/session/' + uuid + '/token/' + token;
+		var bodyStream = await fetch(url);
+		var body = await bodyStream.text();
 		body = body.replaceAll("= ", "").replaceAll("\n", "").replaceAll("\r", "");
+		//var url = 'tmp/garmin_livetracking.txt';
+		//var body = fs.readFileSync(url, 'utf8');
 		/*
 		var bodytab = body.split('<script\s*')
 		bodytab.forEach(element => {
@@ -119,6 +118,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 	        */
 		var tmp0 = body.match(pattern);
 		if (tmp0 === null || tmp0.length < 1) {
+			fs.writeFileSync('tmp/garmin_livetracking.txt', body);
 			res.setHeader('Content-Type', 'text/plain');
 			res.write(inspect(datas));
 		} else {

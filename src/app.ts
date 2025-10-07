@@ -4,7 +4,7 @@ import https from 'https';
 //import * as PATH from 'path';
 //import { readFile, writeFile } from 'fs/promises';
 //import { promises as fs } from 'fs';
-import fs from 'fs'
+import fs from 'fs-extra'
 import fetch from 'node-fetch';
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse, ServerOptions } from "./Common"
