@@ -3,14 +3,21 @@ import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse, MyTree } from "./Common";
 import fs from 'fs-extra';
 import { htpasswd } from "./htpasswd";
+import {  buildGPX, BaseBuilder } from 'gpx-builder';
+//import { Metadata, Point, Segment, Track, Route } from 'gpx-builder/src/Builder/BaseBuilder/models';
 
 //import { getAllValues, getValue, setValue } from "node-global-storage";
+const { create } = require('xmlbuilder2');
+//const { parseXml } = require('libxmljs');
 const url = require('url');
 const bodyParser = require('body-parser');
 const querystring = require('querystring');
 const multipart = require('parse-multipart-data');
-const { buildGPX, GarminBuilder } = require('gpx-builder');
-const { Point, Track } = GarminBuilder.MODELS;
+//const { buildGPX, BaseBuilder } = require('gpx-builder');
+const { Point, Track, Segment, Metadata } =  BaseBuilder.MODELS;
+
+const namespace_locus = 'http://www.locusmap.eu';
+const namespace_gpxtpx = 'http://www.garmin.com/xmlschemas/TrackPointExtension/v2';
 
 class MyMap<K, V> extends Map <K, V> {
 	set(key: K, value: V): this {
@@ -146,11 +153,45 @@ let handleFunction: {[key: string]: MyFunc} = {
 			var tmp1 = tmp0[1].replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
 			var tmp2 = JSON.parse(tmp1);
 			var tmp3 = tmp2["state"]["queries"];
-			var tmp4 = findKey(tmp3, "trackPoints", 6);
+			var tmp4 = findKey(tmp3, "trackPoints", 6).slice(0,3);
 			fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmp4, null, 4));
+			var trkpt = [];
+			var lastPt = tmp4.pop();
+			tmp4.forEach(e => {
+				var ptopt = {
+						'ele': e.altitude,
+						'time': new Date(e.dateTime),
+						'hr': e.fitnessPointData.heartRateBeatsPerMin,
+				};
+				var pt = new Point(
+					e.position.lat,
+					e.position.lon,
+					ptopt
+				);
+				trkpt.push(pt);
+			});
+			var trkseg = new Segment(
+				trkpt,
+			);
+			var trksegs = [];
+			trksegs.push(trkseg);
+			var lineExts = {color: 'FF0000', opacity: 0.78, width: 3.0}
+
+			var trkExts = {line: lineExts, schema: {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}};
+			var trk = new Track(
+				trksegs,
+				{ 
+					name: name,
+					extensions: trkExts,
+				}
+			);
+			var trks = [];
+			trks.push(trk);
+			const gpxData = new BaseBuilder();
+			gpxData.setTracks(trks);
 			res.setHeader('Content-Type', 'application/gpx+xml');
-			res.write("result:\n");
-			res.write(JSON.stringify(tmp4, null, 4));
+			console.log(inspect(gpxData['data']['trk']));
+			res.write(buildGPX(gpxData.toObject()));
 		}
 		res.end('\n');
 	},
