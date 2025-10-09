@@ -27,20 +27,24 @@ class MyMap<K, V> extends Map <K, V> {
 		return this;
 	}
 }
-
 type OneUuidData = {uuid: string, token: string};
 //type UuidsDatas = Record<string, OneUuidData>;
-type UuidsDatas = MyMap<string, (OneUuidData|string)>;
+type MyGroupOfTypes = string|Array<string>|OneUuidData;
+type UuidsDatas = MyMap<string, MyGroupOfTypes>;
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
 var dataTxt: string;
-var datas: UuidsDatas = new MyMap<string, (OneUuidData|string)>();
+var datas: UuidsDatas = new MyMap<string, MyGroupOfTypes>();
 if (fs.existsSync('./database/datas.json')) {
 	dataTxt = fs.readFileSync('./database/datas.json', 'utf8');
 	if (dataTxt !== undefined) {
-		datas = new MyMap<string, OneUuidData>(Object.entries(JSON.parse(dataTxt)));
+		datas = new MyMap<string, MyGroupOfTypes>(Object.entries(JSON.parse(dataTxt)));
 	}
+}
+
+if (datas['activities'] === undefined || datas['activities'] === null) {
+	datas.set('activities', "");
 }
 
 function findKey(obj, target, max) {
@@ -133,66 +137,98 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var url = 'https://livetrack.garmin.com/session/' + uuid + '/token/' + token;
 		var bodyStream = await fetch(url);
 		var body = await bodyStream.text();
+		body = fs.readFileSync('tmp/garmin_livetracking.txt', 'utf8');
 		body = body.replaceAll("= ", "").replaceAll("\n", "").replaceAll("\r", "").replaceAll("\\", "");
-		//var url = 'tmp/garmin_livetracking.txt';
-		//var body = fs.readFileSync(url, 'utf8');
-		/*
-		var bodytab = body.split('<script\s*')
-		bodytab.forEach(element => {
-			if (element.includes('trackPoints')) {
-				console.log(element);
-			}
-		})
-	        */
 		var tmp0 = body.match(pattern);
+		var tmp0_1 = "";
 		if (tmp0 === null || tmp0.length < 1) {
-			res.setHeader('Content-Type', 'text/plain');
-			res.write("tmp1 length :" + tmp0.length);
+			//res.setHeader('Content-Type', 'text/plain');
+			//res.write("tmp1 length :" + (tmp0===null)?0:tmp0.length);
+			console.log("tmp1 length :" + (tmp0===null)?0:tmp0.length);
+			tmp0_1 = fs.readFileSync('tmp/garmin_livetracking_json.txt', 'utf8');
 		} else {
-			fs.writeFileSync('tmp/garmin_livetracking.txt', body);
-			var tmp1 = tmp0[1].replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
-			var tmp2 = JSON.parse(tmp1);
-			var tmp3 = tmp2["state"]["queries"];
-			var tmp4 = findKey(tmp3, "trackPoints", 6).slice(0,3);
-			fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmp4, null, 4));
-			var trkpt = [];
-			var lastPt = tmp4.pop();
-			tmp4.forEach(e => {
-				var ptopt = {
-						'ele': e.altitude,
-						'time': new Date(e.dateTime),
-						'hr': e.fitnessPointData.heartRateBeatsPerMin,
-				};
-				var pt = new Point(
-					e.position.lat,
-					e.position.lon,
-					ptopt
-				);
-				trkpt.push(pt);
-			});
-			var trkseg = new Segment(
-				trkpt,
-			);
-			var trksegs = [];
-			trksegs.push(trkseg);
-			var lineExts = {color: 'FF0000', opacity: 0.78, width: 3.0}
-
-			var trkExts = {line: lineExts, schema: {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}};
-			var trk = new Track(
-				trksegs,
-				{ 
-					name: name,
-					extensions: trkExts,
-				}
-			);
-			var trks = [];
-			trks.push(trk);
-			const gpxData = new BaseBuilder();
-			gpxData.setTracks(trks);
-			res.setHeader('Content-Type', 'application/gpx+xml');
-			console.log(inspect(gpxData['data']['trk']));
-			res.write(buildGPX(gpxData.toObject()));
+			tmp0_1 = tmp0[1];
+			fs.writeFileSync('tmp/garmin_livetracking_json.txt', tmp0_1, {encoding : 'utf8'});
 		}
+			
+		var tmp1 = tmp0_1.replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
+		var tmp2 = JSON.parse(tmp1);
+		var tmp3 = tmp2["state"]["queries"];
+		var tmp4 = findKey(tmp3, "trackPoints", 6).slice(0,5);
+		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmp4, null, 4), {encoding : 'utf8'});
+		var trkpt = [];
+		const gpxData = new BaseBuilder();
+		var lastPt = tmp4.pop();
+		var ptsList = [];
+		var pt = new Point(
+			lastPt.position.lat,
+			lastPt.position.lon,
+			{ name: name }
+		);
+		ptsList.push(pt);
+		gpxData.setWayPoints(ptsList);
+		var activities : Set<string> = new Set<string>((datas.get('activities')) as Array<string>);
+		tmp4.forEach(e => {
+			var str = (new String(e.fitnessPointData.activityType)).toString();
+			activities.add(str);
+			var ptopt = {
+					'ele': e.altitude,
+					'time': new Date(e.dateTime),
+					'hr': e.fitnessPointData.heartRateBeatsPerMin,
+			};
+			pt = new Point(
+				e.position.lat,
+				e.position.lon,
+				ptopt
+			);
+			trkpt.push(pt);
+		});
+		datas.set('activities', Array.from(activities.values()));
+		var trkseg = new Segment(
+			trkpt,
+		);
+		var trksegs = [];
+		trksegs.push(trkseg);
+		var lineExts = {
+			color: 'FF0000', opacity: 0.78, width: 3.0
+		};
+
+		//var trkExts = {'line xmlns:"http://www.topografix.com/GPX/gpx_style/0/2"': lineExts};
+		var trkExts = {'line' : lineExts};
+		var trk = new Track(
+			trksegs,
+			{ 
+				name: name + "Trk",
+				extensions: trkExts,
+			}
+		);
+		var trks = [];
+		trks.push(trk);
+		gpxData.setTracks(trks);
+		res.setHeader('Content-Type', 'application/gpx+xml');
+		var xmlObj = gpxData.toObject();
+		//xmlObj.attributes['xsi:schemaLocation'] = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
+	       	//xmlObj.attributes['xmlns'] = "http://www.topografix.com/GPX/1/1";
+		//xmlObj.attributes['xmlns:xsi'] = "http://www.w3.org/2001/XMLSchema-instance";
+		xmlObj.attributes['xmlns:locus'] = "http://www.locusmap.eu";
+	       	xmlObj.attributes['xmlns:gpxx'] = "http://www.garmin.com/xmlschemas/GpxExtensions/v3";
+		xmlObj.attributes['xmlns:gpxtrkx'] = "http://www.garmin.com/xmlschemas/TrackStatsExtension/v1";
+		xmlObj.attributes['xmlns:gpxtpx'] = "http://www.garmin.com/xmlschemas/TrackPointExtension/v2";
+		var lineObj1 = {'attributes': {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}}
+		var lineObj2 = xmlObj.trk[0].extensions.line;
+		var lineObj3 = { 'extensions':  {'locus:lsColorBase': 'C8FF0000', 'locus:lsWidth': 3.0, 'locus:lsUnits': 'PIXELS'}};
+		var lineObj  = Object.assign({}, lineObj1, lineObj2, lineObj3); 
+		//linetmp['attributes'] = {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"};
+		//Object.replace(xmlObj.trk[0].extensions.line, lineObj2);
+		//res.write(inspect(xmlObj) + "\n");
+		res.write(inspect(lineObj) + "\n");
+		res.write(inspect(xmlObj.trk[0].extensions) + "\n");
+
+		xmlObj.trk[0].extensions.line = {};
+		Object.assign(xmlObj.trk[0].extensions.line, lineObj);
+
+		res.write(inspect(xmlObj.trk[0].extensions) + "\n");
+		res.write(buildGPX(xmlObj));
 		res.end('\n');
 	},
 	pass: (req: MyIncomingMessage, res: ServerResponse) => {

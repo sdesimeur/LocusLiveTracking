@@ -3,7 +3,7 @@
   "display": "Node 16",
   "compilerOptions": {
     "allowJs": true,
-    "lib": ["es2021", "dom", "dom.iterable"], // https://www.e-learn.cn/topic/3468143
+    "lib": ["esnext", "es2021", "dom", "dom.iterable"], // https://www.e-learn.cn/topic/3468143
     "module": "commonjs",
     "target": "es2019",
     "skipLibCheck": true,
