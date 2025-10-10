@@ -128,6 +128,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		}
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
+		console.log('MAIN');
 		var lastActivity = datas.get('activities')[0];
 		res.statusCode = 200;
 		var pattern = new RegExp('.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*');
@@ -218,7 +219,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var trksegs = [];
 		trksegs.push(trkseg);
 		var lineExts = {
-			color: 'FF0000', opacity: 0.78, width: 3.0
+			color: 'FF0000', opacity: '0.78', width: '3.0'
 		};
 
 		//var trkExts = {'line xmlns:"http://www.topografix.com/GPX/gpx_style/0/2"': lineExts};
@@ -255,12 +256,12 @@ let handleFunction: {[key: string]: MyFunc} = {
 		//linetmp['attributes'] = {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"};
 		//Object.replace(xmlObj.trk[0].extensions.line, lineObj2);
 		//res.write(inspect(xmlObj) + "\n");
-		res.write(inspect(xmlObj.trk[0].trkseg[0].extensions) + "\n");
+		//res.write(inspect(xmlObj.trk[0].trkseg[0].extensions) + "\n");
 
 		//xmlObj.trk[0].extensions.line = {};
 		//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
 
-		res.write(buildGPX(xmlObj));
+		res.write(buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', ''));
 		res.end('\n');
 	},
 	pass: (req: MyIncomingMessage, res: ServerResponse) => {
