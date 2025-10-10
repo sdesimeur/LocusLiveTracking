@@ -174,6 +174,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 							'gpxtpx:hr': e.fitnessPointData.heartRateBeatsPerMin||0,
 							'gpxtpx:cad': e.fitnessPointData.cadenceCyclesPerMin||0,
 							'gpxtpx:course': e.fitnessPointData.distanceMeters||0,
+							'gpxtpx:speed': e.fitnessPointData.speedMetersPerSec||0,
 						}
 					}
 			};
