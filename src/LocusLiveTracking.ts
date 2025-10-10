@@ -128,6 +128,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		}
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
+		var lastActivity = datas.get('activities')[0];
 		res.statusCode = 200;
 		var pattern = new RegExp('.*<script\s*>[^{]*({[^<]*trackPoints[^<]*})[^}]*</script\s*>.*');
 		var name = req.queryDatas.get('name').toLowerCase();
@@ -154,27 +155,27 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var tmp1 = tmp0_1.replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
 		var tmp2 = JSON.parse(tmp1);
 		var tmp3 = tmp2["state"]["queries"];
-		var tmp4 = findKey(tmp3, "trackPoints", 6).slice(0,5);
+		//var tmp4 = findKey(tmp3, "trackPoints", 6).slice(0,5);
+		var tmp4 = findKey(tmp3, "trackPoints", 6);
 		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmp4, null, 4), {encoding : 'utf8'});
 		var trkpt = [];
 		const gpxData = new BaseBuilder();
 		var lastPt = tmp4.pop();
-		var ptsList = [];
-		var pt = new Point(
-			lastPt.position.lat,
-			lastPt.position.lon,
-			{ name: name }
-		);
-		ptsList.push(pt);
-		gpxData.setWayPoints(ptsList);
 		var activities : Set<string> = new Set<string>((datas.get('activities')) as Array<string>);
+		var pt;
 		tmp4.forEach(e => {
-			var str = (new String(e.fitnessPointData.activityType)).toString();
-			activities.add(str);
+			lastActivity = (new String(e.fitnessPointData.activityType)).toString().toLowerCase();
+			activities.add(lastActivity);
 			var ptopt = {
 					'ele': e.altitude,
 					'time': new Date(e.dateTime),
-					'hr': e.fitnessPointData.heartRateBeatsPerMin,
+					'extensions': {
+						'gpxtpx:TrackPointExtension': {
+							'gpxtpx:hr': e.fitnessPointData.heartRateBeatsPerMin||0,
+							'gpxtpx:cad': e.fitnessPointData.cadenceCyclesPerMin||0,
+							'gpxtpx:course': e.fitnessPointData.distanceMeters||0,
+						}
+					}
 			};
 			pt = new Point(
 				e.position.lat,
@@ -183,6 +184,32 @@ let handleFunction: {[key: string]: MyFunc} = {
 			);
 			trkpt.push(pt);
 		});
+		var sym = "";
+		switch (lastActivity) {
+		case 'swimming':
+			sym = 'sport-swim-outdoor';
+			break;
+		case 'running':
+			sym = 'sport-hiking';
+			break;
+		case 'cycling':
+			sym = 'sport-cyclingsport';
+			break;
+		default:
+			sym = 'z-ico02';
+			break;
+		}
+		var ptsList = [];
+		var lastWpt = new Point(
+			lastPt.position.lat,
+			lastPt.position.lon,
+			{
+				name: name,
+				sym: sym,
+		       	}
+		);
+		ptsList.push(lastWpt);
+		gpxData.setWayPoints(ptsList);
 		datas.set('activities', Array.from(activities.values()));
 		var trkseg = new Segment(
 			trkpt,
@@ -194,7 +221,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		};
 
 		//var trkExts = {'line xmlns:"http://www.topografix.com/GPX/gpx_style/0/2"': lineExts};
-		var trkExts = {'line' : lineExts};
+		var trkExts = {'line' : lineExts, 'locus:activity': lastActivity};
 		var trk = new Track(
 			trksegs,
 			{ 
@@ -216,18 +243,22 @@ let handleFunction: {[key: string]: MyFunc} = {
 		xmlObj.attributes['xmlns:gpxtpx'] = "http://www.garmin.com/xmlschemas/TrackPointExtension/v2";
 		var lineObj1 = {'attributes': {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}}
 		var lineObj2 = xmlObj.trk[0].extensions.line;
-		var lineObj3 = { 'extensions':  {'locus:lsColorBase': 'C8FF0000', 'locus:lsWidth': 3.0, 'locus:lsUnits': 'PIXELS'}};
-		var lineObj  = Object.assign({}, lineObj1, lineObj2, lineObj3); 
+		var lineObj3 = { 'extensions':  {
+		       	'attributes': lineObj1.attributes,
+			'locus:lsColorBase': 'C8FF0000',
+			'locus:lsWidth': 3.0,
+			'locus:lsUnits': 'PIXELS'},
+		};
+		Object.assign(lineObj2, lineObj1, lineObj3); 
+		Object.assign(lineObj2.extensions, lineObj1);
 		//linetmp['attributes'] = {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"};
 		//Object.replace(xmlObj.trk[0].extensions.line, lineObj2);
 		//res.write(inspect(xmlObj) + "\n");
-		res.write(inspect(lineObj) + "\n");
-		res.write(inspect(xmlObj.trk[0].extensions) + "\n");
+		res.write(inspect(xmlObj.trk[0].trkseg[0].extensions) + "\n");
 
-		xmlObj.trk[0].extensions.line = {};
-		Object.assign(xmlObj.trk[0].extensions.line, lineObj);
+		//xmlObj.trk[0].extensions.line = {};
+		//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
 
-		res.write(inspect(xmlObj.trk[0].extensions) + "\n");
 		res.write(buildGPX(xmlObj));
 		res.end('\n');
 	},
