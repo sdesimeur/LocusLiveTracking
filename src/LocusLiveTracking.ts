@@ -48,7 +48,7 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
 
-function getJsonFor(name: string) {
+async function getJsonFor(name: string): Promise<object> {
 	var tmp10 = datas.get(name);
 	var uuid = tmp10['uuid'];
 	var token = tmp10['token'];
@@ -95,9 +95,7 @@ function getJsonFor(name: string) {
 				'sessionId ' +
 			'} ' +
 		'}",' +
-		'"variables":{"sessionId":"' + uuid + '","token":"' + token + '","begin":"2025-10-11T08:00:24.001Z","disablePolling":true},"operationName":"getTrackPoints"}';
-	console.log('uuid ' + uuid + '\n');
-	console.log('uuid ' + token + '\n');
+		'"variables":{"sessionId":"' + uuid + '","token":"' + token + '","begin":"2025-10-11T08:00:44.001Z","disablePolling":true},"operationName":"getTrackPoints"}';
 	var headers = {
 		"headers": {
 			"content-type": "application/json",
@@ -105,13 +103,11 @@ function getJsonFor(name: string) {
 		"body": body,
 		"method": "POST"
 	};
-	(fetch(url, headers)).then(async r => {
+	var r = await(fetch(url, headers));
 		//var body0 = await text(r.body);
-		var body0 = await (r.text());
-		var newDatas = JSON.parse(body0);
-		//console.log(inspect(body0));
-		console.log(inspect(newDatas.data.trackPointsBySessionId.trackPoints));
-	});
+	var body0 = await (r.text());
+	var newDatas = JSON.parse(body0);
+	return newDatas;
 }
 
 function findKey(obj, target, max) {
@@ -198,10 +194,10 @@ let handleFunction: {[key: string]: MyFunc} = {
 	main_test: async (req: MyIncomingMessage, res: ServerResponse) => {
 		console.log('MAIN_TEST');
 		var name = req.queryDatas.get('name').toLowerCase();
-		getJsonFor(name);
+		var dataMainTest = await getJsonFor(name);
 		res.statusCode = 200;
 		res.setHeader('Content-Type', 'text/plain');
-		res.write("see result in console log");
+		res.write(JSON.stringify(dataMainTest, null, 2));
 		res.end();
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
