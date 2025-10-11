@@ -1,4 +1,5 @@
 //import { uuids } from "./database/uuids";
+import { text } from 'stream/consumers';
 import { inspect } from "util";
 import { MyIncomingMessage, ServerResponse, MyTree } from "./Common";
 import fs from 'fs-extra';
@@ -47,6 +48,72 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
 
+function getJsonFor(name: string) {
+	var tmp10 = datas.get(name);
+	var uuid = tmp10['uuid'];
+	var token = tmp10['token'];
+	var url: string = "https://livetrack.garmin.com/apollo/graphql";
+	var body: string = '{"query":' + 
+		'"query getTrackPoints(' + 
+			'$sessionId: String! ' +
+			'$token: String! ' +
+			'$begin: String ' +
+			'$disablePolling: Boolean ' +
+		') { ' +
+			'trackPointsBySessionId( ' +
+				'sessionId: $sessionId ' +
+				'token: $token ' +
+				'begin: $begin ' +
+				'limit: 3000 ' +
+				'disablePolling: $disablePolling ' +
+			') { ' +
+				'trackPoints { ' +
+					'fitnessPointData { ' +
+						'totalDurationSecs ' +
+						'speedMetersPerSec ' +
+						'totalDistanceMeters ' +
+						'activityType ' +
+						'cadenceCyclesPerMin ' +
+						'distanceMeters ' +
+						'durationSecs ' +
+						'elevationGainMeters ' +
+						'elevationSource ' +
+						'eventTypes ' +
+						'heartRateBeatsPerMin ' +
+						'pointStatus ' +
+						'powerWatts ' +
+						'speedMetersPerSec ' +
+					'} ' +
+					'position { ' +
+						'lat ' +
+						'lon ' +
+					'} ' +
+					'dateTime ' +
+					'speed ' +
+					'altitude ' +
+				'} ' +
+				'sessionId ' +
+			'} ' +
+		'}",' +
+		'"variables":{"sessionId":"' + uuid + '","token":"' + token + '","begin":"2025-10-11T08:00:24.001Z","disablePolling":true},"operationName":"getTrackPoints"}';
+	console.log('uuid ' + uuid + '\n');
+	console.log('uuid ' + token + '\n');
+	var headers = {
+		"headers": {
+			"content-type": "application/json",
+		},
+		"body": body,
+		"method": "POST"
+	};
+	(fetch(url, headers)).then(async r => {
+		//var body0 = await text(r.body);
+		var body0 = await (r.text());
+		var newDatas = JSON.parse(body0);
+		//console.log(inspect(body0));
+		console.log(inspect(newDatas.data.trackPointsBySessionId.trackPoints));
+	});
+}
+
 function findKey(obj, target, max) {
 	var l = 0;
 	const fnd = o => {
@@ -83,6 +150,7 @@ let handlePath = {
 		upload: null,
 		pass: null,
 	},
+	main_test : null,
 	main : null,
 }
 
@@ -126,6 +194,15 @@ let handleFunction: {[key: string]: MyFunc} = {
 				res.end("\n");
 			}
 		}
+	},
+	main_test: async (req: MyIncomingMessage, res: ServerResponse) => {
+		console.log('MAIN_TEST');
+		var name = req.queryDatas.get('name').toLowerCase();
+		getJsonFor(name);
+		res.statusCode = 200;
+		res.setHeader('Content-Type', 'text/plain');
+		res.write("see result in console log");
+		res.end();
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
 		console.log('MAIN');
