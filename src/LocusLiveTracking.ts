@@ -21,33 +21,49 @@ const namespace_locus = 'http://www.locusmap.eu';
 const namespace_gpxtpx = 'http://www.garmin.com/xmlschemas/TrackPointExtension/v2';
 
 class MyMap<K, V> extends Map <K, V> {
+	filename: string = '';
+	constructor(f: string) {
+		super();
+		this.filename = f;
+		var dataTxt: string = undefined;
+		if (fs.existsSync(f)) {
+			dataTxt = fs.readFileSync(f, 'utf8');
+		}
+		if (dataTxt !== undefined) {
+			for (const [key, value] of Object.entries(JSON.parse(dataTxt))) {
+				this.set(key as K, value as V);
+			}
+		}
+	}
 	set(key: K, value: V): this {
 		super.set(key, value);
 		const txt: string = JSON.stringify(Object.fromEntries(this));
-		fs.writeFileSync('./database/datas.json', txt, {encoding :'utf8', flag: 'w', flush: true});
+		fs.writeFileSync(this.filename, txt, {encoding :'utf8', flag: 'w', flush: true});
 		return this;
 	}
 }
 
-type OneUuidData = {uuid: string, token: string};
+type OneUuidData = {uuid: string, token: string, date: number, datas: Array<any>};
 //type UuidsDatas = Record<string, OneUuidData>;
-type MyGroupOfTypes = string|Array<string>|OneUuidData;
-type UuidsDatas = MyMap<string, MyGroupOfTypes>;
+type MyGroupOfTypesDatas = number|string|Array<string>|OneUuidData|Array<any>;
+type UuidsDatas = MyMap<string, MyGroupOfTypesDatas>;
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
-var dataTxt: string;
-var lastDate:number = Date.now() - (1000 * 3600 * 24 * 2); 
-var trackpointList = [];
+var datas: UuidsDatas = new MyMap<string, MyGroupOfTypesDatas>('database/datas.json');
 
-var datas: UuidsDatas = new MyMap<string, MyGroupOfTypes>();
-if (fs.existsSync('./database/datas.json')) {
-	dataTxt = fs.readFileSync('./database/datas.json', 'utf8');
+/*
+
+) {
+	dataTxt = fs.readFileSynci
+	, 'utf8');
 	if (dataTxt !== undefined) {
-		datas = new MyMap<string, MyGroupOfTypes>(Object.entries(JSON.parse(dataTxt)));
+		datas = new MyMap<string, MyGroupOfTypesDatas>('/database/clients.json', Object.entries(JSON.parse(dataTxt)));
 	}
+} else {
+	datas = new MyMap<string, MyGroupOfTypesDatas>('./database/clients.json');
 }
-
+*/
 if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
@@ -157,6 +173,7 @@ let handlePath = {
 
 let handleFunction: {[key: string]: MyFunc} = {
 	upload: async (req: MyIncomingMessage, res: ServerResponse) => {
+		var datenow: number = Date.now() - 30 * 60 * 1000;
 		var header = req.headers.authorization || '';
 		var token = header.split(/\s+/).pop() || '';
 		var auth = Buffer.from(token, 'base64').toString(); // convert from base64
@@ -188,7 +205,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 				noHandlePath(req, res);
 			} else {
 	        		var name = tmp1[1].toLowerCase();
-			       	datas.set(name, {uuid: uuid, token: token});
+			       	datas.set(name, {uuid: uuid, token: token, date: datenow, datas: []});
 				res.statusCode = 200;
 				res.setHeader('Content-Type', 'text/plain');
 				res.write("Mail handled !");
@@ -196,38 +213,56 @@ let handleFunction: {[key: string]: MyFunc} = {
 			}
 		}
 	},
-	/*
 	main_test: async (req: MyIncomingMessage, res: ServerResponse) => {
 		console.log('MAIN_TEST');
 		var name = req.queryDatas.get('name').toLowerCase();
-		var dataMainTest = await getJsonFor(name);
+		var tmp0_1 = fs.readFileSync('tmp/garmin_livetracking_json.txt', 'utf8');
+		var tmp0_2 = tmp0_1.replaceAll('"[', "[").replaceAll(']"', "]").replaceAll("'[", "[").replaceAll("]'", "]")
+		var tmp0 = JSON.parse(tmp0_2).state.queries;
+		var tmp1 = findKey(tmp0, "trackPoints", 6);
+		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
+		var tmpDatas: undefined|Array<any>;
+		tmpDatas = datasByName.datas;
+		tmpDatas = tmpDatas.concat(tmp1);
+		datasByName.datas = tmpDatas;
+	
+		datas.set(name, datasByName);
+		//var dataMainTest = await getJsonFor(name);
 		res.statusCode = 200;
 		res.setHeader('Content-Type', 'text/plain');
-		res.write(JSON.stringify(dataMainTest, null, 2));
+		//res.write(JSON.stringify(dataMainTest, null, 2));
+		res.write(req.socket.remoteAddress.split(":").pop() + "\n");
 		res.end();
 	},
-       */
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
-		console.log('MAIN');
+		console.log('MAIN\n');
 		var lastActivity = datas.get('activities')[0];
 		res.statusCode = 200;
 		var name = req.queryDatas.get('name').toLowerCase();
-		var oldDate = lastDate;
-		lastDate = Date.now();
+		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
+		var oldDate = datasByName.date;
+		datasByName.date = Date.now();
 		var tmp0 = await getJsonFor(name, oldDate);
 			
 		//var tmp4 = findKey(tmp0, "trackPoints", 6).slice(0,5);
 		var tmp1 = findKey(tmp0, "trackPoints", 6);
+		var tmpDatas: undefined|Array<any>;
+		tmpDatas = datasByName.datas;
+		if (tmpDatas === undefined || tmpDatas === null) tmpDatas = [];
 		if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
-			trackpointList = trackpointList.concat(tmp1);
+			tmpDatas = tmpDatas.concat(tmp1);
+			datasByName.datas = tmpDatas;
+			datas.set(name, datasByName);
 		}
-		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(trackpointList, null, 4), {encoding : 'utf8'});
-		var trkpt = [];
+		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmpDatas, null, 4), {encoding : 'utf8'});
+		
 		const gpxData = new BaseBuilder();
-		var lastPt;
+		var trksegs = [];
+		var trkpt = [];
+		var lastPt = undefined;
 		var activities : Set<string> = new Set<string>((datas.get('activities')) as Array<string>);
 		var pt;
-		trackpointList.forEach(e => {
+		tmpDatas.forEach(e => {
 			lastPt = e;
 			lastActivity = (new String(e.fitnessPointData.activityType)).toString().toLowerCase();
 			activities.add(lastActivity);
@@ -267,21 +302,22 @@ let handleFunction: {[key: string]: MyFunc} = {
 			break;
 		}
 		var ptsList = [];
-		var lastWpt = new Point(
-			lastPt.position.lat,
-			lastPt.position.lon,
-			{
-				name: name,
-				sym: sym,
-		       	}
-		);
-		ptsList.push(lastWpt);
+		if (lastPt !== undefined) {
+			var lastWpt = new Point(
+				lastPt.position.lat,
+				lastPt.position.lon,
+				{
+					name: name,
+					sym: sym,
+			       	}
+			);
+			ptsList.push(lastWpt);
+		}
 		gpxData.setWayPoints(ptsList);
 		datas.set('activities', Array.from(activities.values()));
 		var trkseg = new Segment(
 			trkpt,
 		);
-		var trksegs = [];
 		trksegs.push(trkseg);
 		var lineExts = {
 			color: 'FF0000', opacity: '0.78', width: '3.0'
@@ -515,6 +551,7 @@ function handleNext (req: MyIncomingMessage, res: ServerResponse, path: Object) 
 			if (func !== handleFunction['pass'] && func !== handleFunction['upload'])
 			{
 				if (req.queryDatas.get('pass') != datas.get('pass')) {
+					console.log('Wrong password');
 					res.statusCode = 404;
 					res.setHeader('Content-Type', 'text/plain');
 					res.end('Wrong password!\n');

@@ -3,3 +3,5 @@ node_modules/
 database/datas.json
 **/htpasswd.ts
 tmp/
+database/datas_save.json
+
