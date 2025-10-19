@@ -285,7 +285,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 			);
 			trkpt.push(pt);
 		});
-
+		datasByName.date = (new Date(lastPt.dateTime)).getTime();
+		datas.set(name, datasByName);
 		var sym = "";
 		switch (lastActivity) {
 		case 'swimming':
