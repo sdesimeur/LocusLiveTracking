@@ -254,6 +254,10 @@ let handleFunction: {[key: string]: MyFunc} = {
 			datasByName.datas = tmpDatas;
 			datas.set(name, datasByName);
 		}
+		if (tmpDatas.length === 0) {
+			res.end('\n');
+			return;
+		}
 		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmpDatas, null, 4), {encoding : 'utf8'});
 		
 		const gpxData = new BaseBuilder();
