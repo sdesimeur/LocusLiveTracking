@@ -68,7 +68,7 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
 
-async function getJsonFor(name: string, lastdate: number): Promise<object> {
+async function getApolloGraphQlJsonFor(name: string, lastdate: number): Promise<Response> {
 	var dateStr = (new Date(lastdate)).toUTCString();
 	var tmp10 = datas.get(name);
 	var uuid = tmp10['uuid'];
@@ -124,10 +124,17 @@ async function getJsonFor(name: string, lastdate: number): Promise<object> {
 		"body": body,
 		"method": "POST"
 	};
-	var r = await(fetch(url, headers));
-		//var body0 = await text(r.body);
-	var body0 = await (r.text());
-	var newDatas = JSON.parse(body0);
+	const r = await(fetch(url, headers));
+	//var body0 = await (r.text());
+	//console.log(body0);
+	return r;
+}
+
+async function getJsonFor(name: string, lastdate: number): Promise<object> {
+	const r = await getApolloGraphQlJsonFor(name,lastdate);
+	const body = await (r.text());
+	console.log(body);
+	const newDatas = JSON.parse(body);
 	return newDatas;
 }
 
@@ -184,9 +191,11 @@ let handleFunction: {[key: string]: MyFunc} = {
 			badAuthentication(req, res);
 			return;
 		}
+		fs.writeFileSync('tmp/upload.txt', JSON.stringify(req.body, null, 4), {encoding : 'utf8'});
 		const expreg0  = new RegExp('https://livetrack\.garmin\.com/session/([a-f0-9\-]{36})/token/([0-9A-Fa-f]*)[^0-9a-fA-F]', 'i');
 		req.body = req.body.replaceAll('= ', '').replaceAll("\r", '').replaceAll("\n", '');
 		var tmp0 = req.body.match(expreg0);
+		console.log(JSON.stringify(tmp0));
 		var name: string = "";
 		var uuid: string = "";
 		var token: string = "";
@@ -206,6 +215,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 			} else {
 	        		var name = tmp1[1].toLowerCase();
 			       	datas.set(name, {uuid: uuid, token: token, date: datenow, datas: []});
+				console.log(JSON.stringify(datas));
 				res.statusCode = 200;
 				res.setHeader('Content-Type', 'text/plain');
 				res.write("Mail handled !");
@@ -243,7 +253,6 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var oldDate = datasByName.date;
 		datasByName.date = Date.now();
 		var tmp0 = await getJsonFor(name, oldDate);
-			
 		//var tmp4 = findKey(tmp0, "trackPoints", 6).slice(0,5);
 		var tmp1 = findKey(tmp0, "trackPoints", 6);
 		var tmpDatas: undefined|Array<any>;
@@ -578,10 +587,10 @@ export function handle (req: MyIncomingMessage, res: ServerResponse) {
 		//console.log(inspect(req));
 		var pass: string = undefined;
 		req.queryDatas = new Map<string, string>();
-		const urlDatas = url.parse(req.url);
-		if (urlDatas.query !== undefined && urlDatas.query !== null) {
-			//const temp = querystring.parse(urlDatas.query);
-			const temp = new URLSearchParams(urlDatas.query);
+		//const urlDatas = url.parse(req.url);
+		const urlDatas = URL.parse(req.url, "https://vps4.sd2.me:3443");
+		const temp = urlDatas.searchParams;
+		if (temp !== undefined && temp !== null) {
 			for (const [key, value] of temp.entries()) {
 				req.queryDatas.set(key, value);
 			}
