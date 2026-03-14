@@ -315,17 +315,21 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var pt;
 		tmpDatas.forEach(e => {
 			lastPt = e;
-			lastActivity = (new String(e.fitnessPointData?.activityType || "")).toString().toLowerCase();
+			let infos = e.fitnessPointData;
+			if (infos === undefined || infos === null) {
+				infos = e;
+			}
+			lastActivity = (new String(e.activityType || "")).toString().toLowerCase();
 			activities.add(lastActivity);
 			var ptopt = {
 					'ele': e.altitude,
 					'time': new Date(e.dateTime),
 					'extensions': {
 						'gpxtpx:TrackPointExtension': {
-							'gpxtpx:hr': e.fitnessPointData?.heartRateBeatsPerMin||0,
-							'gpxtpx:cad': e.fitnessPointData?.cadenceCyclesPerMin||0,
-							'gpxtpx:course': e.fitnessPointData?.distanceMeters||0,
-							'gpxtpx:speed': e.fitnessPointData?.speedMetersPerSec||0,
+							'gpxtpx:hr': infos.heartRateBeatsPerMin||0,
+							'gpxtpx:cad': infos.cadenceCyclesPerMin||0,
+							//'gpxtpx:course': infos.distanceMeters||0,
+							'gpxtpx:speed': infos.speedMetersPerSec||0,
 						}
 					}
 			};
@@ -350,7 +354,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 			sym = 'sport-cyclingsport';
 			break;
 		default:
-			sym = 'z-ico02';
+			//sym = 'z-ico02';
+			sym = 'sport-hiking';
 			break;
 		}
 		var ptsList = [];
