@@ -5,12 +5,13 @@ import { MyIncomingMessage, ServerResponse, MyTree } from "./Common";
 import fs from 'fs-extra';
 import { htpasswd } from "./htpasswd";
 import {  buildGPX, BaseBuilder } from 'gpx-builder';
+import { parse } from "node-html-parser";
+
 //import { Metadata, Point, Segment, Track, Route } from 'gpx-builder/src/Builder/BaseBuilder/models';
 
 //import { getAllValues, getValue, setValue } from "node-global-storage";
 const { create } = require('xmlbuilder2');
 //const { parseXml } = require('libxmljs');
-const url = require('url');
 const bodyParser = require('body-parser');
 const querystring = require('querystring');
 const multipart = require('parse-multipart-data');
@@ -68,11 +69,8 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
 
-async function getApolloGraphQlJsonFor(name: string, lastdate: number): Promise<Response> {
+async function getApolloGraphQlJsonFor(uuid: string, token: string, lastdate: number): Promise<Response> {
 	var dateStr = (new Date(lastdate)).toUTCString();
-	var tmp10 = datas.get(name);
-	var uuid = tmp10['uuid'];
-	var token = tmp10['token'];
 	var url: string = "https://livetrack.garmin.com/apollo/graphql";
 	var body: string = '{"query":' + 
 		'"query getTrackPoints(' + 
@@ -125,15 +123,39 @@ async function getApolloGraphQlJsonFor(name: string, lastdate: number): Promise<
 		"method": "POST"
 	};
 	const r = await(fetch(url, headers));
-	//var body0 = await (r.text());
-	//console.log(body0);
+	return r;
+}
+async function getOriginJsonFor(uuid: string, token: string): Promise<Response> {
+	let url = "https://livetrack.garmin.com/session/" + uuid + "/token/" + token;
+	var headers = {
+		"headers": {
+			'accept': '*/*',
+			'content-type': 'application/x-www-form-urlencoded; charset=UTF-8'
+		},
+		"body": null,
+		"mode": "same-origin" as RequestMode,
+		"method": "GET"
+	};
+	const data = await(fetch(url, headers));
+	const cookies = data.headers.get('set-cookie') as (string | undefined);
+	const root = parse(await(data.text()));
+	const crf_token = root.querySelector('meta[name="csrf-token"]')?.getAttribute("content");;
+	url = "https://livetrack.garmin.com/api/sessions/" + uuid + "/track-points/common?token=" + token;
+	headers["headers"]["livetrack-csrf-token"] = crf_token;
+	headers["headers"]["cookie"] = cookies;
+	const r = await(fetch(url, headers));
 	return r;
 }
 
 async function getJsonFor(name: string, lastdate: number): Promise<object> {
-	const r = await getApolloGraphQlJsonFor(name,lastdate);
+	var tmp10 = datas.get(name);
+	var uuid = tmp10['uuid'];
+	var token = tmp10['token'];
+	let r = await getApolloGraphQlJsonFor(uuid, token ,lastdate);
+	if (r.statusText === 'Bad Request') {
+		r = await getOriginJsonFor(uuid, token);
+	}
 	const body = await (r.text());
-	console.log(body);
 	const newDatas = JSON.parse(body);
 	return newDatas;
 }
@@ -277,17 +299,17 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var pt;
 		tmpDatas.forEach(e => {
 			lastPt = e;
-			lastActivity = (new String(e.fitnessPointData.activityType)).toString().toLowerCase();
+			lastActivity = (new String(e.fitnessPointData?.activityType || "")).toString().toLowerCase();
 			activities.add(lastActivity);
 			var ptopt = {
 					'ele': e.altitude,
 					'time': new Date(e.dateTime),
 					'extensions': {
 						'gpxtpx:TrackPointExtension': {
-							'gpxtpx:hr': e.fitnessPointData.heartRateBeatsPerMin||0,
-							'gpxtpx:cad': e.fitnessPointData.cadenceCyclesPerMin||0,
-							'gpxtpx:course': e.fitnessPointData.distanceMeters||0,
-							'gpxtpx:speed': e.fitnessPointData.speedMetersPerSec||0,
+							'gpxtpx:hr': e.fitnessPointData?.heartRateBeatsPerMin||0,
+							'gpxtpx:cad': e.fitnessPointData?.cadenceCyclesPerMin||0,
+							'gpxtpx:course': e.fitnessPointData?.distanceMeters||0,
+							'gpxtpx:speed': e.fitnessPointData?.speedMetersPerSec||0,
 						}
 					}
 			};
@@ -376,7 +398,9 @@ let handleFunction: {[key: string]: MyFunc} = {
 		//xmlObj.trk[0].extensions.line = {};
 		//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
 
-		res.write(buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', ''));
+		const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '');
+		fs.writeFileSync('tmp/last.gpx', toSend, {encoding : 'utf8'});
+		res.write(toSend);
 		res.end('\n');
 	},
 	/*
