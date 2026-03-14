@@ -69,8 +69,7 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 	datas.set('activities', "");
 }
 
-async function getApolloGraphQlJsonFor(uuid: string, token: string, lastdate: number): Promise<Response> {
-	var dateStr = (new Date(lastdate)).toUTCString();
+async function getApolloGraphQlJsonFor(uuid: string, token: string, dateStr: string): Promise<Response> {
 	var url: string = "https://livetrack.garmin.com/apollo/graphql";
 	var body: string = '{"query":' + 
 		'"query getTrackPoints(' + 
@@ -148,12 +147,16 @@ async function getOriginJsonFor(uuid: string, token: string): Promise<Response> 
 }
 
 async function getJsonFor(name: string, lastdate: number): Promise<object> {
+	var dateStr = (new Date(lastdate)).toUTCString();
 	var tmp10 = datas.get(name);
 	var uuid = tmp10['uuid'];
 	var token = tmp10['token'];
-	let r = await getApolloGraphQlJsonFor(uuid, token ,lastdate);
+	let r = await getApolloGraphQlJsonFor(uuid, token, dateStr);
 	if (r.statusText === 'Bad Request') {
 		r = await getOriginJsonFor(uuid, token);
+		console.log("Download from complete activity");
+	} else {
+		console.log("Download from apollo graphql after " + dateStr);
 	}
 	const body = await (r.text());
 	const newDatas = JSON.parse(body);
@@ -267,29 +270,41 @@ let handleFunction: {[key: string]: MyFunc} = {
 		res.end();
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
-		console.log('MAIN\n');
 		var lastActivity = datas.get('activities')[0];
 		res.statusCode = 200;
 		var name = req.queryDatas.get('name').toLowerCase();
 		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
 		var oldDate = datasByName.date;
 		datasByName.date = Date.now();
-		var tmp0 = await getJsonFor(name, oldDate);
-		//var tmp4 = findKey(tmp0, "trackPoints", 6).slice(0,5);
-		var tmp1 = findKey(tmp0, "trackPoints", 6);
+		console.log('\nMAIN ' + (new Date(datasByName.date)).toUTCString());
 		var tmpDatas: undefined|Array<any>;
 		tmpDatas = datasByName.datas;
-		if (tmpDatas === undefined || tmpDatas === null) tmpDatas = [];
-		if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
-			tmpDatas = tmpDatas.concat(tmp1);
-			datasByName.datas = tmpDatas;
-			datas.set(name, datasByName);
+		var download = true;
+		if (tmpDatas === undefined || tmpDatas === null) {
+			tmpDatas = [];
+		} else if (tmpDatas.length !== 0) {
+			const lastIdx = tmpDatas.length - 1;
+		       	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
+			download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
 		}
+		if (!download) {
+			console.log("Nothing to download");
+		} else {
+			var tmp0 = await getJsonFor(name, oldDate);
+			var tmp1 = findKey(tmp0, "trackPoints", 6);
+			if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
+				tmpDatas = tmpDatas.concat(tmp1);
+				datasByName.datas = tmpDatas;
+				datas.set(name, datasByName);
+			}
+		}
+
 		if (tmpDatas.length === 0) {
+			console.log("Nothing to send");
 			res.end('\n');
 			return;
 		}
-		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(tmpDatas, null, 4), {encoding : 'utf8'});
+		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(datasByName, null, 4), {encoding : 'utf8'});
 		
 		const gpxData = new BaseBuilder();
 		var trksegs = [];
