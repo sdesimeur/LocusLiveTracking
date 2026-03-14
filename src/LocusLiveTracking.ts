@@ -301,6 +301,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 
 		if (tmpDatas.length === 0) {
 			console.log("Nothing to send");
+			res.setHeader('Content-Type', 'text/plain');
 			res.end('\n');
 			return;
 		}
