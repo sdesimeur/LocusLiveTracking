@@ -44,7 +44,7 @@ class MyMap<K, V> extends Map <K, V> {
 	}
 }
 
-type OneUuidData = {uuid: string, token: string, date: number, datas: Array<any>};
+type OneUuidData = {uuid: string, token: string, csrf_token: string, cookies: string, date: number, datas: Array<any>};
 //type UuidsDatas = Record<string, OneUuidData>;
 type MyGroupOfTypesDatas = number|string|Array<string>|OneUuidData|Array<any>;
 type UuidsDatas = MyMap<string, MyGroupOfTypesDatas>;
@@ -70,6 +70,7 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 }
 
 async function getApolloGraphQlJsonFor(uuid: string, token: string, dateStr: string): Promise<Response> {
+	console.log(dateStr);
 	var url: string = "https://livetrack.garmin.com/apollo/graphql";
 	var body: string = '{"query":' + 
 		'"query getTrackPoints(' + 
@@ -124,8 +125,8 @@ async function getApolloGraphQlJsonFor(uuid: string, token: string, dateStr: str
 	const r = await(fetch(url, headers));
 	return r;
 }
-async function getOriginJsonFor(uuid: string, token: string): Promise<Response> {
-	let url = "https://livetrack.garmin.com/session/" + uuid + "/token/" + token;
+async function getOriginJsonFor(uuid: string, token: string, dataByName: MyGroupOfTypesDatas, dateStr: string): Promise<Response> {
+	var url = "";
 	var headers = {
 		"headers": {
 			'accept': '*/*',
@@ -135,12 +136,21 @@ async function getOriginJsonFor(uuid: string, token: string): Promise<Response> 
 		"mode": "same-origin" as RequestMode,
 		"method": "GET"
 	};
-	const data = await(fetch(url, headers));
-	const cookies = data.headers.get('set-cookie') as (string | undefined);
-	const root = parse(await(data.text()));
-	const crf_token = root.querySelector('meta[name="csrf-token"]')?.getAttribute("content");;
-	url = "https://livetrack.garmin.com/api/sessions/" + uuid + "/track-points/common?token=" + token;
-	headers["headers"]["livetrack-csrf-token"] = crf_token;
+	var cookies = dataByName["cookies"];
+	var csrf_token = dataByName["csrf_token"];
+	if (cookies === "") {
+		console.log("Download cookies and csrf_token");
+		url = "https://livetrack.garmin.com/session/" + uuid + "/token/" + token;
+		const data = await(fetch(url, headers));
+		cookies = data.headers.get('set-cookie') as (string | undefined);
+		const root = parse(await(data.text()));
+		csrf_token = root.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+		dataByName["cookies"] = cookies;
+		dataByName["csrf_token"] = csrf_token;
+	}
+	url = "https://livetrack.garmin.com/api/sessions/" + uuid + "/track-points/common?token=" + token + "&begin=" + encodeURI(dateStr);
+
+	headers["headers"]["livetrack-csrf-token"] = csrf_token;
 	headers["headers"]["cookie"] = cookies;
 	const r = await(fetch(url, headers));
 	return r;
@@ -151,15 +161,19 @@ async function getJsonFor(name: string, lastdate: number): Promise<object> {
 	var tmp10 = datas.get(name);
 	var uuid = tmp10['uuid'];
 	var token = tmp10['token'];
-	let r = await getApolloGraphQlJsonFor(uuid, token, dateStr);
-	if (r.statusText === 'Bad Request') {
-		r = await getOriginJsonFor(uuid, token);
-		console.log("Download from complete activity");
-	} else {
-		console.log("Download from apollo graphql after " + dateStr);
+	var csrf_token = tmp10['csrf_token'];
+	var cookies = tmp10['cookies'];
+	//let r = await getApolloGraphQlJsonFor(uuid, token, dateStr);
+	let r = await getOriginJsonFor(uuid, token, tmp10, dateStr);
+	if (csrf_token !== tmp10["csrf_token"]) {
+		datas.set(name, tmp10);
+		console.log("Save cookies and csrf_token");
 	}
 	const body = await (r.text());
-	const newDatas = JSON.parse(body);
+	var newDatas = {};
+	if (body !== undefined && body !== null && body !== "") {
+		newDatas = JSON.parse(body);
+	}
 	return newDatas;
 }
 
@@ -205,7 +219,7 @@ let handlePath = {
 
 let handleFunction: {[key: string]: MyFunc} = {
 	upload: async (req: MyIncomingMessage, res: ServerResponse) => {
-		var datenow: number = Date.now() - 30 * 60 * 1000;
+		var datenow: number = Date.now() - 24 * 60 * 60 * 1000;
 		var header = req.headers.authorization || '';
 		var token = header.split(/\s+/).pop() || '';
 		var auth = Buffer.from(token, 'base64').toString(); // convert from base64
@@ -239,7 +253,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 				noHandlePath(req, res);
 			} else {
 	        		var name = tmp1[1].toLowerCase();
-			       	datas.set(name, {uuid: uuid, token: token, date: datenow, datas: []});
+			       	datas.set(name, {uuid: uuid, token: token, csrf_token: "", cookies: "", date: datenow, datas: []});
 				console.log(JSON.stringify(datas));
 				res.statusCode = 200;
 				res.setHeader('Content-Type', 'text/plain');
@@ -276,6 +290,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
 		var oldDate = datasByName.date;
 		datasByName.date = Date.now();
+		datas.set(name, datasByName);
 		console.log('\nMAIN ' + (new Date(datasByName.date)).toUTCString());
 		var tmpDatas: undefined|Array<any>;
 		tmpDatas = datasByName.datas;
@@ -298,7 +313,6 @@ let handleFunction: {[key: string]: MyFunc} = {
 				datas.set(name, datasByName);
 			}
 		}
-
 		if (tmpDatas.length === 0) {
 			console.log("Nothing to send");
 			res.setHeader('Content-Type', 'text/plain');
