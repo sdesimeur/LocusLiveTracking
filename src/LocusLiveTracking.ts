@@ -288,6 +288,12 @@ let handleFunction: {[key: string]: MyFunc} = {
 		res.statusCode = 200;
 		var name = req.queryDatas.get('name').toLowerCase();
 		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
+		if (datasByName === undefined || datasByName === null) {
+			console.log("Nothing to send");
+			res.setHeader('Content-Type', 'text/plain');
+			res.end('\n');
+			return;
+		}
 		var oldDate = datasByName.date;
 		datasByName.date = Date.now();
 		datas.set(name, datasByName);
@@ -295,6 +301,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 		var tmpDatas: undefined|Array<any>;
 		tmpDatas = datasByName.datas;
 		var download = true;
+		var sessionEnded = true;
+		var sessionInProgress = true;
 		if (tmpDatas === undefined || tmpDatas === null) {
 			tmpDatas = [];
 		} else if (tmpDatas.length !== 0) {
@@ -302,6 +310,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 		       	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
 			download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
 		}
+		sessionInProgress = download;
 		if (!download) {
 			console.log("Nothing to download");
 		} else {
@@ -373,7 +382,7 @@ let handleFunction: {[key: string]: MyFunc} = {
 			break;
 		}
 		var ptsList = [];
-		if (lastPt !== undefined) {
+		if (sessionInProgress && lastPt !== undefined) {
 			var lastWpt = new Point(
 				lastPt.position.lat,
 				lastPt.position.lon,
@@ -383,8 +392,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 			       	}
 			);
 			ptsList.push(lastWpt);
+			gpxData.setWayPoints(ptsList);
 		}
-		gpxData.setWayPoints(ptsList);
 		datas.set('activities', Array.from(activities.values()));
 		var trkseg = new Segment(
 			trkpt,
