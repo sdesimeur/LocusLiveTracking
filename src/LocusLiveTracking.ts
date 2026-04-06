@@ -295,9 +295,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 			return;
 		}
 		var oldDate = datasByName.date;
-		datasByName.date = Date.now();
-		datas.set(name, datasByName);
-		console.log('\nMAIN ' + (new Date(datasByName.date)).toUTCString());
+		var newDate = Date.now();
+		console.log('\nMAIN ' + (new Date(newDate)).toUTCString());
 		var tmpDatas: undefined|Array<any>;
 		tmpDatas = datasByName.datas;
 		var download = true;
@@ -311,15 +310,22 @@ let handleFunction: {[key: string]: MyFunc} = {
 			download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
 		}
 		sessionInProgress = download;
-		if (!download) {
-			console.log("Nothing to download");
+		var deltaTime = Math.floor((newDate - oldDate) / 1000);
+		if (deltaTime < 30) {
+			console.log("No download: only " + deltaTime + "s elapsed since last download");
 		} else {
-			var tmp0 = await getJsonFor(name, oldDate);
-			var tmp1 = findKey(tmp0, "trackPoints", 6);
-			if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
-				tmpDatas = tmpDatas.concat(tmp1);
-				datasByName.datas = tmpDatas;
-				datas.set(name, datasByName);
+			datasByName.date = newDate;
+			datas.set(name, datasByName);
+			if (!download) {
+				console.log("Nothing to download");
+			} else {
+				var tmp0 = await getJsonFor(name, oldDate);
+				var tmp1 = findKey(tmp0, "trackPoints", 6);
+				if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
+					tmpDatas = tmpDatas.concat(tmp1);
+					datasByName.datas = tmpDatas;
+					datas.set(name, datasByName);
+				}
 			}
 		}
 		if (tmpDatas.length === 0) {
