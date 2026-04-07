@@ -208,6 +208,171 @@ function badAuthentication (req: MyIncomingMessage, res: ServerResponse) {
 	res.end('Bad Authentication!\n');
 }
 
+async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
+	var lastActivity = datas.get('activities')[0];
+	var name = req.queryDatas.get('name').toLowerCase();
+	var datasByName: OneUuidData = datas.get(name) as OneUuidData;
+	if (datasByName === undefined || datasByName === null) {
+		console.log("Nothing to send");
+		return null;
+	}
+	var oldDate = datasByName.date;
+	var newDate = Date.now();
+	console.log('\nMAIN ' + (new Date(newDate)).toUTCString());
+	var tmpDatas: undefined|Array<any>;
+	tmpDatas = datasByName.datas;
+	var download = true;
+	var sessionEnded = true;
+	var sessionInProgress = true;
+	if (tmpDatas === undefined || tmpDatas === null) {
+		tmpDatas = [];
+	} else if (tmpDatas.length !== 0) {
+		const lastIdx = tmpDatas.length - 1;
+	       	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
+		download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
+	}
+	sessionInProgress = download;
+	var deltaTime = Math.floor((newDate - oldDate) / 1000);
+	if (deltaTime < 30) {
+		console.log("No download: only " + deltaTime + "s elapsed since last download");
+	} else {
+		datasByName.date = newDate;
+		datas.set(name, datasByName);
+		if (!download) {
+			console.log("Nothing to download");
+		} else {
+			var tmp0 = await getJsonFor(name, oldDate);
+			console.log(tmp0);
+			var tmp1 = findKey(tmp0, "trackPoints", 6);
+			if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
+				tmpDatas = tmpDatas.concat(tmp1);
+				datasByName.datas = tmpDatas;
+				datas.set(name, datasByName);
+			}
+		}
+	}
+	if (tmpDatas.length === 0) {
+		console.log("Nothing to send");
+		return null;
+	}
+	fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(datasByName, null, 4), {encoding : 'utf8'});
+	
+	const gpxData = new BaseBuilder();
+	var trksegs = [];
+	var trkpt = [];
+	var lastPt = undefined;
+	var activities : Set<string> = new Set<string>((datas.get('activities')) as Array<string>);
+	var pt;
+	tmpDatas.forEach(e => {
+		lastPt = e;
+		let infos = e.fitnessPointData;
+		if (infos === undefined || infos === null) {
+			infos = e;
+		}
+		lastActivity = (new String(e.activityType || "")).toString().toLowerCase();
+		activities.add(lastActivity);
+		var ptopt = {
+				'ele': e.altitude,
+				'time': new Date(e.dateTime),
+				'extensions': {
+					'gpxtpx:TrackPointExtension': {
+						'gpxtpx:hr': infos.heartRateBeatsPerMin||0,
+						'gpxtpx:cad': infos.cadenceCyclesPerMin||0,
+						//'gpxtpx:course': infos.distanceMeters||0,
+						'gpxtpx:speed': infos.speedMetersPerSec||0,
+					}
+				}
+		};
+		pt = new Point(
+			e.position.lat,
+			e.position.lon,
+			ptopt
+		);
+		trkpt.push(pt);
+	});
+	datasByName.date = (new Date(lastPt.dateTime)).getTime();
+	datas.set(name, datasByName);
+	var sym = "";
+	switch (lastActivity) {
+	case 'swimming':
+		sym = 'sport-swim-outdoor';
+		break;
+	case 'running':
+		sym = 'sport-hiking';
+		break;
+	case 'cycling':
+		sym = 'sport-cyclingsport';
+		break;
+	default:
+		//sym = 'z-ico02';
+		sym = 'sport-hiking';
+		break;
+	}
+	var ptsList = [];
+	if (sessionInProgress && lastPt !== undefined) {
+		var lastWpt = new Point(
+			lastPt.position.lat,
+			lastPt.position.lon,
+			{
+				name: name,
+				sym: sym,
+		       	}
+		);
+		ptsList.push(lastWpt);
+		gpxData.setWayPoints(ptsList);
+	}
+	datas.set('activities', Array.from(activities.values()));
+	var trkseg = new Segment(
+		trkpt,
+	);
+	trksegs.push(trkseg);
+	var lineExts = {
+		color: 'FF0000', opacity: '0.78', width: '3.0'
+	};
+
+	//var trkExts = {'line xmlns:"http://www.topografix.com/GPX/gpx_style/0/2"': lineExts};
+	var trkExts = {'line' : lineExts, 'locus:activity': lastActivity};
+	var trk = new Track(
+		trksegs,
+		{ 
+			name: name + "Trk",
+			extensions: trkExts,
+		}
+	);
+	var trks = [];
+	trks.push(trk);
+	gpxData.setTracks(trks);
+	var xmlObj = gpxData.toObject();
+	//xmlObj.attributes['xsi:schemaLocation'] = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
+       	//xmlObj.attributes['xmlns'] = "http://www.topografix.com/GPX/1/1";
+	//xmlObj.attributes['xmlns:xsi'] = "http://www.w3.org/2001/XMLSchema-instance";
+	xmlObj.attributes['xmlns:locus'] = "http://www.locusmap.eu";
+       	xmlObj.attributes['xmlns:gpxx'] = "http://www.garmin.com/xmlschemas/GpxExtensions/v3";
+	xmlObj.attributes['xmlns:gpxtrkx'] = "http://www.garmin.com/xmlschemas/TrackStatsExtension/v1";
+	xmlObj.attributes['xmlns:gpxtpx'] = "http://www.garmin.com/xmlschemas/TrackPointExtension/v2";
+	var lineObj1 = {'attributes': {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}}
+	var lineObj2 = xmlObj.trk[0].extensions.line;
+	var lineObj3 = { 'extensions':  {
+	       	'attributes': lineObj1.attributes,
+		'locus:lsColorBase': 'C8FF0000',
+		'locus:lsWidth': 3.0,
+		'locus:lsUnits': 'PIXELS'},
+	};
+	Object.assign(lineObj2, lineObj1, lineObj3); 
+	Object.assign(lineObj2.extensions, lineObj1);
+	//linetmp['attributes'] = {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"};
+	//Object.replace(xmlObj.trk[0].extensions.line, lineObj2);
+	//res.write(inspect(xmlObj) + "\n");
+	//res.write(inspect(xmlObj.trk[0].trkseg[0].extensions) + "\n");
+
+	//xmlObj.trk[0].extensions.line = {};
+	//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
+
+	const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '');
+	fs.writeFileSync('tmp/last.gpx', toSend, {encoding : 'utf8'});
+	return toSend;
+}
+
 let handlePath = {
 	admin : {
 		upload: null,
@@ -284,174 +449,16 @@ let handleFunction: {[key: string]: MyFunc} = {
 		res.end();
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
-		var lastActivity = datas.get('activities')[0];
+		const ret: (string|null) = await prepareRes(req);	
 		res.statusCode = 200;
-		var name = req.queryDatas.get('name').toLowerCase();
-		var datasByName: OneUuidData = datas.get(name) as OneUuidData;
-		if (datasByName === undefined || datasByName === null) {
-			console.log("Nothing to send");
+		if (ret === null) {
 			res.setHeader('Content-Type', 'text/plain');
 			res.end('\n');
-			return;
-		}
-		var oldDate = datasByName.date;
-		var newDate = Date.now();
-		console.log('\nMAIN ' + (new Date(newDate)).toUTCString());
-		var tmpDatas: undefined|Array<any>;
-		tmpDatas = datasByName.datas;
-		var download = true;
-		var sessionEnded = true;
-		var sessionInProgress = true;
-		if (tmpDatas === undefined || tmpDatas === null) {
-			tmpDatas = [];
-		} else if (tmpDatas.length !== 0) {
-			const lastIdx = tmpDatas.length - 1;
-		       	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
-			download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
-		}
-		sessionInProgress = download;
-		var deltaTime = Math.floor((newDate - oldDate) / 1000);
-		if (deltaTime < 30) {
-			console.log("No download: only " + deltaTime + "s elapsed since last download");
 		} else {
-			datasByName.date = newDate;
-			datas.set(name, datasByName);
-			if (!download) {
-				console.log("Nothing to download");
-			} else {
-				var tmp0 = await getJsonFor(name, oldDate);
-				var tmp1 = findKey(tmp0, "trackPoints", 6);
-				if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
-					tmpDatas = tmpDatas.concat(tmp1);
-					datasByName.datas = tmpDatas;
-					datas.set(name, datasByName);
-				}
-			}
-		}
-		if (tmpDatas.length === 0) {
-			console.log("Nothing to send");
-			res.setHeader('Content-Type', 'text/plain');
+			res.setHeader('Content-Type', 'application/gpx+xml');
+			res.write(ret);
 			res.end('\n');
-			return;
 		}
-		fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(datasByName, null, 4), {encoding : 'utf8'});
-		
-		const gpxData = new BaseBuilder();
-		var trksegs = [];
-		var trkpt = [];
-		var lastPt = undefined;
-		var activities : Set<string> = new Set<string>((datas.get('activities')) as Array<string>);
-		var pt;
-		tmpDatas.forEach(e => {
-			lastPt = e;
-			let infos = e.fitnessPointData;
-			if (infos === undefined || infos === null) {
-				infos = e;
-			}
-			lastActivity = (new String(e.activityType || "")).toString().toLowerCase();
-			activities.add(lastActivity);
-			var ptopt = {
-					'ele': e.altitude,
-					'time': new Date(e.dateTime),
-					'extensions': {
-						'gpxtpx:TrackPointExtension': {
-							'gpxtpx:hr': infos.heartRateBeatsPerMin||0,
-							'gpxtpx:cad': infos.cadenceCyclesPerMin||0,
-							//'gpxtpx:course': infos.distanceMeters||0,
-							'gpxtpx:speed': infos.speedMetersPerSec||0,
-						}
-					}
-			};
-			pt = new Point(
-				e.position.lat,
-				e.position.lon,
-				ptopt
-			);
-			trkpt.push(pt);
-		});
-		datasByName.date = (new Date(lastPt.dateTime)).getTime();
-		datas.set(name, datasByName);
-		var sym = "";
-		switch (lastActivity) {
-		case 'swimming':
-			sym = 'sport-swim-outdoor';
-			break;
-		case 'running':
-			sym = 'sport-hiking';
-			break;
-		case 'cycling':
-			sym = 'sport-cyclingsport';
-			break;
-		default:
-			//sym = 'z-ico02';
-			sym = 'sport-hiking';
-			break;
-		}
-		var ptsList = [];
-		if (sessionInProgress && lastPt !== undefined) {
-			var lastWpt = new Point(
-				lastPt.position.lat,
-				lastPt.position.lon,
-				{
-					name: name,
-					sym: sym,
-			       	}
-			);
-			ptsList.push(lastWpt);
-			gpxData.setWayPoints(ptsList);
-		}
-		datas.set('activities', Array.from(activities.values()));
-		var trkseg = new Segment(
-			trkpt,
-		);
-		trksegs.push(trkseg);
-		var lineExts = {
-			color: 'FF0000', opacity: '0.78', width: '3.0'
-		};
-
-		//var trkExts = {'line xmlns:"http://www.topografix.com/GPX/gpx_style/0/2"': lineExts};
-		var trkExts = {'line' : lineExts, 'locus:activity': lastActivity};
-		var trk = new Track(
-			trksegs,
-			{ 
-				name: name + "Trk",
-				extensions: trkExts,
-			}
-		);
-		var trks = [];
-		trks.push(trk);
-		gpxData.setTracks(trks);
-		res.setHeader('Content-Type', 'application/gpx+xml');
-		var xmlObj = gpxData.toObject();
-		//xmlObj.attributes['xsi:schemaLocation'] = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
-	       	//xmlObj.attributes['xmlns'] = "http://www.topografix.com/GPX/1/1";
-		//xmlObj.attributes['xmlns:xsi'] = "http://www.w3.org/2001/XMLSchema-instance";
-		xmlObj.attributes['xmlns:locus'] = "http://www.locusmap.eu";
-	       	xmlObj.attributes['xmlns:gpxx'] = "http://www.garmin.com/xmlschemas/GpxExtensions/v3";
-		xmlObj.attributes['xmlns:gpxtrkx'] = "http://www.garmin.com/xmlschemas/TrackStatsExtension/v1";
-		xmlObj.attributes['xmlns:gpxtpx'] = "http://www.garmin.com/xmlschemas/TrackPointExtension/v2";
-		var lineObj1 = {'attributes': {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"}}
-		var lineObj2 = xmlObj.trk[0].extensions.line;
-		var lineObj3 = { 'extensions':  {
-		       	'attributes': lineObj1.attributes,
-			'locus:lsColorBase': 'C8FF0000',
-			'locus:lsWidth': 3.0,
-			'locus:lsUnits': 'PIXELS'},
-		};
-		Object.assign(lineObj2, lineObj1, lineObj3); 
-		Object.assign(lineObj2.extensions, lineObj1);
-		//linetmp['attributes'] = {'xmlns': "http://www.topografix.com/GPX/gpx_style/0/2"};
-		//Object.replace(xmlObj.trk[0].extensions.line, lineObj2);
-		//res.write(inspect(xmlObj) + "\n");
-		//res.write(inspect(xmlObj.trk[0].trkseg[0].extensions) + "\n");
-
-		//xmlObj.trk[0].extensions.line = {};
-		//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
-
-		const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '');
-		fs.writeFileSync('tmp/last.gpx', toSend, {encoding : 'utf8'});
-		res.write(toSend);
-		res.end('\n');
 	},
 	/*
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {

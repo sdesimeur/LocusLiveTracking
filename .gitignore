@@ -5,3 +5,4 @@ database/datas.json
 tmp/
 database/datas_save.json
 
+download.sh
