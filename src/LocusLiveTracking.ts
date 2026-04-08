@@ -242,7 +242,6 @@ async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
 			console.log("Nothing to download");
 		} else {
 			var tmp0 = await getJsonFor(name, oldDate);
-			console.log(tmp0);
 			var tmp1 = findKey(tmp0, "trackPoints", 6);
 			if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
 				tmpDatas = tmpDatas.concat(tmp1);
