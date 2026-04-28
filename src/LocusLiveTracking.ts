@@ -449,7 +449,11 @@ let handleFunction: {[key: string]: MyFunc} = {
 				noHandlePath(req, res);
 			} else {
 	        		var name = tmp1[1].toLowerCase();
-				const timeInterval: Timeout = setInterval(downloadRes, 30000, name);
+				var timeInterval: Timeout = timers.get(name);
+				if (timeInterval !== undefined) {
+					clearInterval(timeInterval);
+				}
+				timeInterval = setInterval(downloadRes, 30000, name);
 				timers.set(name, timeInterval);
 			       	datas.set(name, {uuid: uuid, token: token, csrf_token: "", cookies: "", date: datenow, datas: []});
 				console.log(JSON.stringify(datas));
