@@ -44,14 +44,27 @@ class MyMap<K, V> extends Map <K, V> {
 	}
 }
 
+type Timeout = any;
 type OneUuidData = {uuid: string, token: string, csrf_token: string, cookies: string, date: number, datas: Array<any>};
 //type UuidsDatas = Record<string, OneUuidData>;
 type MyGroupOfTypesDatas = number|string|Array<string>|OneUuidData|Array<any>;
 type UuidsDatas = MyMap<string, MyGroupOfTypesDatas>;
 type MyFunc = (req: MyIncomingMessage, res: ServerResponse) => void;
+type UuidsTimer = Map<string, (Timeout|null)>;
 
 //var uuids: UuidsDatas = new Map<string, OneUuidData>();
 var datas: UuidsDatas = new MyMap<string, MyGroupOfTypesDatas>('database/datas.json');
+var timers: UuidsTimer = new Map<string, Timeout>
+
+const mapIter = datas.keys();
+var val = null;
+while (val !== undefined) {
+	val = mapIter.next().value;
+	if (val !== "pass" && val !== "activities" && val !== undefined) {
+		const timeInterval: Timeout = setInterval(downloadRes, 30000, val);
+		timers.set(val, timeInterval)
+	}
+}
 
 /*
 
@@ -167,7 +180,7 @@ async function getJsonFor(name: string, lastdate: number): Promise<object> {
 	let r = await getOriginJsonFor(uuid, token, tmp10, dateStr);
 	if (csrf_token !== tmp10["csrf_token"]) {
 		datas.set(name, tmp10);
-		console.log("Save cookies and csrf_token");
+		console.log("Save cookies and csrf_token (" + name + ")");
 	}
 	const body = await (r.text());
 	var newDatas = {};
@@ -208,17 +221,17 @@ function badAuthentication (req: MyIncomingMessage, res: ServerResponse) {
 	res.end('Bad Authentication!\n');
 }
 
-async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
+async function downloadRes (name: string) {
+	const timer : (Timeout|undefined) = timers.get(name);
 	var lastActivity = datas.get('activities')[0];
-	var name = req.queryDatas.get('name').toLowerCase();
 	var datasByName: OneUuidData = datas.get(name) as OneUuidData;
 	if (datasByName === undefined || datasByName === null) {
-		console.log("Nothing to send");
-		return null;
+		console.log('\nDOWNLOAD END (' + name + ') : ' + (new Date(newDate)).toUTCString());
+		return;
 	}
 	var oldDate = datasByName.date;
 	var newDate = Date.now();
-	console.log('\nMAIN ' + (new Date(newDate)).toUTCString());
+	console.log('\nDOWNLOAD (' + name + ') : ' + (new Date(newDate)).toUTCString());
 	var tmpDatas: undefined|Array<any>;
 	tmpDatas = datasByName.datas;
 	var download = true;
@@ -230,32 +243,48 @@ async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
 		const lastIdx = tmpDatas.length - 1;
 	       	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
 		download = lastPtEvents.every((e) => e.toLowerCase() !== "end");
+		if (!download) {
+			if (timer !== null) clearInterval(timer);
+			console.log('\nDOWNLOAD END (' + name + ') : ' + (new Date(newDate)).toUTCString());
+			return;
+		}
 	}
-	sessionInProgress = download;
 	var deltaTime = Math.floor((newDate - oldDate) / 1000);
 	if (deltaTime < 30) {
-		console.log("No download: only " + deltaTime + "s elapsed since last download");
+		console.log("No download (" + name + ") : only " + deltaTime + "s elapsed since last download");
 	} else {
 		datasByName.date = newDate;
 		datas.set(name, datasByName);
-		if (!download) {
-			console.log("Nothing to download");
-		} else {
-			var tmp0 = await getJsonFor(name, oldDate);
-			var tmp1 = findKey(tmp0, "trackPoints", 6);
-			if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
-				tmpDatas = tmpDatas.concat(tmp1);
-				datasByName.datas = tmpDatas;
-				datas.set(name, datasByName);
-			}
+		var tmp0 = await getJsonFor(name, oldDate);
+		var tmp1 = findKey(tmp0, "trackPoints", 6);
+		if (tmp1 !== null && tmp1 !== undefined && tmp1.length !== 0) {
+			tmpDatas = tmpDatas.concat(tmp1);
+			datasByName.datas = tmpDatas;
+			datas.set(name, datasByName);
 		}
 	}
 	if (tmpDatas.length === 0) {
-		console.log("Nothing to send");
-		return null;
+		if (timer !== null) clearInterval(timer);
+		console.log('\nDOWNLOAD END (' + name + ') : ' + (new Date(newDate)).toUTCString());
+		return;
 	}
 	fs.writeFileSync('tmp/garmin_datas.json', JSON.stringify(datasByName, null, 4), {encoding : 'utf8'});
-	
+}
+
+async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
+	var lastActivity = datas.get('activities')[0];
+	var name = req.queryDatas.get('name').toLowerCase();
+	var datasByName: OneUuidData = datas.get(name) as OneUuidData;
+	if (datasByName === undefined || datasByName === null) {
+		console.log("Nothing to send (" + name + ")");
+		return null;
+	}
+	var tmpDatas: undefined|Array<any>;
+	tmpDatas = datasByName.datas;
+	if (tmpDatas === undefined || tmpDatas === null || tmpDatas.length === 0) {
+		console.log("Nothing to send (" + name + ")");
+		return null;
+	}
 	const gpxData = new BaseBuilder();
 	var trksegs = [];
 	var trkpt = [];
@@ -308,6 +337,9 @@ async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
 		break;
 	}
 	var ptsList = [];
+	const lastIdx = tmpDatas.length - 1;
+	const lastPtEvents = tmpDatas[lastIdx].eventTypes;
+	const sessionInProgress = lastPtEvents.every((e) => e.toLowerCase() !== "end");
 	if (sessionInProgress && lastPt !== undefined) {
 		var lastWpt = new Point(
 			lastPt.position.lat,
@@ -417,6 +449,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 				noHandlePath(req, res);
 			} else {
 	        		var name = tmp1[1].toLowerCase();
+				const timeInterval: Timeout = setInterval(downloadRes, 30000, name);
+				timers.set(name, timeInterval);
 			       	datas.set(name, {uuid: uuid, token: token, csrf_token: "", cookies: "", date: datenow, datas: []});
 				console.log(JSON.stringify(datas));
 				res.statusCode = 200;
@@ -449,6 +483,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
 		const ret: (string|null) = await prepareRes(req);	
+		var newDate = Date.now();
+		console.log('\nMAIN (' + name + ') : ' + (new Date(newDate)).toUTCString());
 		res.statusCode = 200;
 		if (ret === null) {
 			res.setHeader('Content-Type', 'text/plain');
