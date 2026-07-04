@@ -84,7 +84,7 @@ if (datas['activities'] === undefined || datas['activities'] === null) {
 
 async function getApolloGraphQlJsonFor(uuid: string, token: string, dateStr: string): Promise<Response> {
 	console.log(dateStr);
-	var url: string = "https://livetrack.garmin.com/apollo/graphql";
+	var url: string = "http://livetrack.garmin.com/apollo/graphql";
 	var body: string = '{"query":' + 
 		'"query getTrackPoints(' + 
 			'$sessionId: String! ' +
@@ -185,7 +185,13 @@ async function getJsonFor(name: string, lastdate: number): Promise<object> {
 	const body = await (r.text());
 	var newDatas = {};
 	if (body !== undefined && body !== null && body !== "") {
-		newDatas = JSON.parse(body);
+		try {
+			newDatas = JSON.parse(body);
+		} catch (err) {
+			console.log("Message :", err.message);
+    			console.log("Nom :", err.name);
+			fs.writeFileSync('tmp/lastbodyerror', JSON.stringify(body, null, 4), {encoding : 'utf8'});
+		}
 	}
 	return newDatas;
 }
@@ -399,7 +405,8 @@ async function prepareRes (req: MyIncomingMessage): Promise<(string|null)> {
 	//xmlObj.trk[0].extensions.line = {};
 	//Object.assign(xmlObj.trk[0].extensions.line, lineObj2);
 
-	const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '');
+	const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '').replaceAll('https://','http://');
+	//const toSend = buildGPX(xmlObj).replace('<line>', '<line xmlns="http://www.topografix.com/GPX/gpx_style/0/2">').replaceAll(' xmlns=""', '');
 	fs.writeFileSync('tmp/last.gpx', toSend, {encoding : 'utf8'});
 	return toSend;
 }
@@ -486,7 +493,8 @@ let handleFunction: {[key: string]: MyFunc} = {
 		res.end();
 	},
 	main: async (req: MyIncomingMessage, res: ServerResponse) => {
-		const ret: (string|null) = await prepareRes(req);	
+		const ret: (string|null) = await prepareRes(req);
+		const name: string = req.queryDatas.get("name");
 		var newDate = Date.now();
 		console.log('\nMAIN (' + name + ') : ' + (new Date(newDate)).toUTCString());
 		res.statusCode = 200;
@@ -709,6 +717,7 @@ export function handle (req: MyIncomingMessage, res: ServerResponse) {
 		req.queryDatas = new Map<string, string>();
 		//const urlDatas = url.parse(req.url);
 		const urlDatas = URL.parse(req.url, "https://vps4.sd2.me:3443");
+		console.log(req.url);
 		const temp = urlDatas.searchParams;
 		if (temp !== undefined && temp !== null) {
 			for (const [key, value] of temp.entries()) {

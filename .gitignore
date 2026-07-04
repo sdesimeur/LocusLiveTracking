@@ -6,3 +6,6 @@ tmp/
 database/datas_save.json
 
 download.sh
+screenrc
+runInScreen.sh
+
